@@ -318,7 +318,7 @@
     main.querySelectorAll("[data-status]").forEach(btn => btn.addEventListener("click", async () => {
       const memberId = btn.getAttribute("data-memberid");
       const status = btn.getAttribute("data-status");
-      if (status === "present") { renderDuty(); openVerify(memberId); return; }
+      if (status === "present") { openVerify(memberId); return; }
       await upsertAttendance(memberId, currentDate, { status, verified:false, geo:null, time_in:null });
       renderDuty();
     }));
