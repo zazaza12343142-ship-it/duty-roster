@@ -12,26 +12,51 @@
   .card { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:24px; width:100%; max-width:360px; text-align:center; }
   h1 { font-size:18px; margin:0 0 6px; }
   p { color:#8A97A8; font-size:13px; margin-bottom:20px; }
-  input { width:100%; background:#0F1720; border:1px solid #2A3547; color:#E7ECF2; border-radius:8px; padding:10px 12px; font-size:14px; margin-bottom:10px; }
+  input, select { width:100%; background:#0F1720; border:1px solid #2A3547; color:#E7ECF2; border-radius:8px; padding:10px 12px; font-size:14px; margin-bottom:10px; }
   button { background:#E3A008; border:none; color:#0F1720; font-weight:800; border-radius:8px; padding:11px 16px; font-size:14px; cursor:pointer; }
   button:disabled { opacity:.6; }
   .err { color:#D64545; font-size:12px; margin-top:8px; }
-  .ok { color:#2FAE60; font-size:13px; }
   .ghost { background:none; border:1px solid #3A4658; color:#C7D0DC; }
-  .danger { background:none; border:1px solid #D64545; color:#D64545; padding:6px 10px; font-size:12px; }
-  header { position:sticky; top:0; background:#0F1720ee; backdrop-filter:blur(6px); border-bottom:1px solid #1E2B41; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; z-index:10; }
+  header { position:sticky; top:0; background:#0F1720ee; backdrop-filter:blur(6px); border-bottom:1px solid #1E2B41; z-index:10; }
+  .headerTop { padding:14px 16px 0; display:flex; justify-content:space-between; align-items:center; }
   .brand { font-weight:800; font-size:16px; }
+  .tabs { display:flex; gap:16px; padding:10px 16px 0; }
+  .tabBtn { background:none; border:none; color:#E7ECF2; font-weight:700; font-size:13.5px; padding:8px 2px 10px; cursor:pointer; border-bottom:2px solid transparent; opacity:.55; }
+  .tabBtn.active { opacity:1; border-bottom-color:#E3A008; }
   main { max-width:900px; margin:0 auto; padding:16px; }
   .rosterGrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:14px; }
   .unitCard { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:16px; }
   .unitTitle { font-weight:800; font-size:17px; margin-bottom:4px; background:transparent; border:none; border-bottom:2px solid #2A3547; color:#E7ECF2; width:100%; padding:4px 2px; }
-  .memberRow { display:flex; justify-content:space-between; align-items:center; background:#0F1720; border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:13.5px; }
-  .pinTag { font-size:11px; color:#8A97A8; background:#141F2E; border-radius:6px; padding:3px 7px; cursor:pointer; margin-inline-start:8px; }
+  .memberRow { background:#0F1720; border:1px solid #1E2B41; border-radius:10px; padding:8px; margin-bottom:8px; }
+  .memberRowTop { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13.5px; font-weight:700; }
+  .pinTag { font-size:11px; color:#8A97A8; background:#141F2E; border-radius:6px; padding:3px 7px; cursor:pointer; }
   .addRow { display:flex; gap:6px; margin-top:10px; }
   .addRow input { margin-bottom:0; flex:1; }
   .xbtn { background:none; border:none; color:#5B6779; cursor:pointer; font-size:14px; padding:2px 6px; }
-  .empty { color:#5B6779; font-size:13px; padding:10px 0; }
+  .empty { color:#5B6779; font-size:13px; padding:10px 0; text-align:center; background:#141F2E; border:1px dashed #2A3547; border-radius:10px; }
   .loading { color:#8A97A8; text-align:center; padding:40px; }
+  .dateBar { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .dateMain { font-weight:800; font-size:15px; }
+  .iconbtn { background:#172236; border:1px solid #2A3547; color:#E7ECF2; border-radius:10px; padding:8px 14px; cursor:pointer; font-size:16px; }
+  .linkbtn { background:none; border:none; color:#E3A008; font-size:12px; cursor:pointer; text-decoration:underline; }
+  .dutyBanner { display:flex; justify-content:space-between; align-items:center; background:linear-gradient(90deg,#2A2108,#0F1720); border:1px solid #4A3A0F; border-radius:12px; padding:12px 16px; margin-bottom:14px; }
+  .dutyLabel { font-size:12px; color:#C7A94A; }
+  .dutyUnit { font-weight:800; font-size:17px; color:#F0C94A; }
+  .shiftGrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); gap:12px; }
+  .shiftCard { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:12px; }
+  .shiftHeader { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #2A3547; padding-bottom:8px; margin-bottom:10px; font-weight:800; }
+  .pillsRow { display:flex; gap:4px; flex-wrap:wrap; margin-top:2px; }
+  .pill { border:1.5px solid; border-radius:8px; padding:5px 8px; cursor:pointer; font-size:12px; background:transparent; font-weight:700; }
+  .pill.active { color:#0F1720; }
+  .assignChip { background:#1E2B41; border:1px dashed #3A4658; color:#C7D0DC; border-radius:8px; padding:5px 9px; font-size:12px; cursor:pointer; margin:3px; }
+  .verifyBox { display:flex; align-items:center; gap:6px; background:#1A1508; border:1px solid #4A3A0F; border-radius:8px; padding:6px 8px; margin-top:6px; }
+  .verifyBox input { width:70px; margin:0; padding:5px 6px; font-size:13px; letter-spacing:2px; }
+  .miniBtn { background:#E3A008; border:none; color:#0F1720; font-weight:800; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer; }
+  .miniBtnGhost { background:none; border:1px solid #3A4658; color:#C7D0DC; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer; }
+  .timeRow { display:flex; align-items:center; gap:6px; margin-top:8px; border-top:1px dashed #2A3547; padding-top:6px; font-size:12px; color:#8A97A8; }
+  .timeRow input[type=time] { width:auto; margin:0; padding:3px 6px; font-size:12px; }
+  .geoLink { font-size:11px; color:#3B82C4; display:block; margin-top:4px; }
+  .geoNote { font-size:11px; color:#5B6779; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -44,6 +69,31 @@
   const app = document.getElementById("app");
 
   const genPin = () => String(Math.floor(1000 + Math.random() * 9000));
+  const pad = (n) => String(n).padStart(2, "0");
+  const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+  const addDays = (iso, n) => { const d = new Date(iso+"T00:00:00"); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+  const dayNameAr = (iso) => ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"][new Date(iso+"T00:00:00").getDay()];
+  const monthNameAr = (iso) => {
+    const names=["كانون الثاني","شباط","آذار","نيسان","أيار","حزيران","تموز","آب","أيلول","تشرين الأول","تشرين الثاني","كانون الأول"];
+    const d = new Date(iso+"T00:00:00");
+    return `${d.getDate()} ${names[d.getMonth()]} ${d.getFullYear()}`;
+  };
+  const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+  const SHIFTS = [
+    { id:"morning", label:"صباحي", range:"08:00 – 16:00", start:8, color:"#E3A008" },
+    { id:"evening", label:"مسائي", range:"16:00 – 00:00", start:16, color:"#3B82C4" },
+    { id:"night", label:"ليلي", range:"00:00 – 08:00", start:0, color:"#7C6FE0" },
+  ];
+  const STATUS = {
+    present:{label:"حاضر",color:"#2FAE60"}, absent:{label:"غائب",color:"#D64545"},
+    leave:{label:"إجازة",color:"#3B82C4"}, travel:{label:"سفر",color:"#7C6FE0"},
+    excuse:{label:"عذر",color:"#E3A008"}, sick:{label:"مرض",color:"#C4643B"},
+  };
+
+  let UNITS = [], MEMBERS = [], ROTATION = null;
+  let currentTab = "roster";
+  let currentDate = todayISO();
 
   function renderLogin(errMsg) {
     app.innerHTML = `
@@ -63,73 +113,98 @@
       btn.disabled = true; btn.textContent = "...";
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) { renderLogin(error.message); return; }
-      renderApp();
+      await bootApp();
     };
   }
 
   async function ensureDefaultUnits() {
-    const { data, error } = await sb.from("units").select("*").order("name");
-    if (error) { console.error(error); return []; }
-    if (data.length === 0) {
-      const { data: inserted, error: insErr } = await sb.from("units")
-        .insert([{ name: "السرية الأولى" }, { name: "السرية الثانية" }])
-        .select();
-      if (insErr) { console.error(insErr); return []; }
-      return inserted;
+    const { data } = await sb.from("units").select("*").order("name");
+    if (data && data.length === 0) {
+      const { data: inserted } = await sb.from("units").insert([{ name:"السرية الأولى" }, { name:"السرية الثانية" }]).select();
+      return inserted || [];
     }
-    return data;
+    return data || [];
   }
-
   async function loadMembers(unitIds) {
-    const { data, error } = await sb.from("members").select("*").in("unit_id", unitIds).order("created_at");
-    if (error) { console.error(error); return []; }
-    return data;
+    const { data } = await sb.from("members").select("*").in("unit_id", unitIds).order("created_at");
+    return data || [];
+  }
+  async function getRotation(units) {
+    const { data } = await sb.from("settings").select("*").eq("key","rotation").maybeSingle();
+    if (data) return data.value;
+    const value = { date: todayISO(), onDutyUnit: units[0].id };
+    await sb.from("settings").insert({ key:"rotation", value });
+    return value;
+  }
+  function getOnDutyUnitId(units, rotation, dateISO) {
+    const anchor = new Date(rotation.date+"T00:00:00");
+    const target = new Date(dateISO+"T00:00:00");
+    const diffDays = Math.round((target - anchor) / 86400000);
+    const weekIndex = Math.floor(diffDays / 7);
+    const other = units.find(u => u.id !== rotation.onDutyUnit)?.id || rotation.onDutyUnit;
+    const parity = ((weekIndex % 2) + 2) % 2;
+    return parity === 0 ? rotation.onDutyUnit : other;
   }
 
-  async function renderApp() {
+  async function bootApp() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) { renderLogin(); return; }
 
     app.innerHTML = `
       <header>
-        <div class="brand">🛡️ سجلّ الدوام</div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-size:12px;color:#8A97A8">${user.email}</span>
-          <button class="ghost" id="logoutBtn" style="padding:6px 10px;font-size:12px">خروج</button>
+        <div class="headerTop">
+          <div class="brand">🛡️ سجلّ الدوام</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:12px;color:#8A97A8">${escapeHtml(user.email)}</span>
+            <button class="ghost" id="logoutBtn" style="padding:6px 10px;font-size:12px">خروج</button>
+          </div>
+        </div>
+        <div class="tabs">
+          <button class="tabBtn" data-tab="duty">الدوام اليومي</button>
+          <button class="tabBtn" data-tab="roster">الطاقم</button>
         </div>
       </header>
-      <main id="main"><div class="loading">...جارِ تحميل الطاقم</div></main>
+      <main id="main"><div class="loading">...جارِ التحميل</div></main>
     `;
-    document.getElementById("logoutBtn").onclick = async () => {
-      await sb.auth.signOut();
-      renderLogin();
-    };
+    document.getElementById("logoutBtn").onclick = async () => { await sb.auth.signOut(); renderLogin(); };
+    document.querySelectorAll(".tabBtn").forEach(b => b.addEventListener("click", () => { currentTab = b.getAttribute("data-tab"); render(); }));
 
-    await renderRoster();
+    UNITS = await ensureDefaultUnits();
+    MEMBERS = await loadMembers(UNITS.map(u => u.id));
+    ROTATION = await getRotation(UNITS);
+
+    render();
   }
 
-  async function renderRoster() {
-    const main = document.getElementById("main");
-    const units = await ensureDefaultUnits();
-    const members = await loadMembers(units.map(u => u.id));
+  function render() {
+    document.querySelectorAll(".tabBtn").forEach(b => b.classList.toggle("active", b.getAttribute("data-tab") === currentTab));
+    if (currentTab === "roster") renderRoster();
+    else renderDuty();
+  }
 
+  // ---------- Roster ----------
+  async function refreshRosterData() {
+    UNITS = await ensureDefaultUnits();
+    MEMBERS = await loadMembers(UNITS.map(u => u.id));
+  }
+
+  function renderRoster() {
+    const main = document.getElementById("main");
     main.innerHTML = `
       <div class="rosterGrid">
-        ${units.map(u => `
-          <div class="unitCard" data-unit="${u.id}">
+        ${UNITS.map(u => `
+          <div class="unitCard">
             <input class="unitTitle" data-rename="${u.id}" value="${escapeHtml(u.name)}" />
-            <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">
-              ${members.filter(m => m.unit_id === u.id).length} فرد
-            </div>
-            <div class="memberList">
-              ${members.filter(m => m.unit_id === u.id).map(m => `
-                <div class="memberRow">
+            <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">${MEMBERS.filter(m=>m.unit_id===u.id).length} فرد</div>
+            <div>
+              ${MEMBERS.filter(m=>m.unit_id===u.id).map(m => `
+                <div class="memberRow"><div class="memberRowTop">
                   <span>${escapeHtml(m.name)}</span>
                   <span>
                     <span class="pinTag" data-showpin="${m.id}" data-pin="${m.pin}">••••</span>
                     <button class="xbtn" data-removemember="${m.id}">🗑️</button>
                   </span>
-                </div>
+                </div></div>
               `).join("") || `<div class="empty">لا يوجد أفراد بعد</div>`}
             </div>
             <div class="addRow">
@@ -140,54 +215,215 @@
         `).join("")}
       </div>
     `;
-
-    main.querySelectorAll("[data-rename]").forEach(input => {
-      input.addEventListener("change", async () => {
-        const id = input.getAttribute("data-rename");
-        await sb.from("units").update({ name: input.value.trim() }).eq("id", id);
-      });
-    });
-
-    main.querySelectorAll("[data-showpin]").forEach(span => {
-      span.addEventListener("click", () => {
-        span.textContent = span.textContent === "••••" ? span.getAttribute("data-pin") : "••••";
-      });
-    });
-
-    main.querySelectorAll("[data-removemember]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-removemember");
-        await sb.from("members").delete().eq("id", id);
-        await renderRoster();
-      });
-    });
-
-    main.querySelectorAll("[data-addmember]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const unitId = btn.getAttribute("data-addmember");
-        const input = main.querySelector(`[data-newname="${unitId}"]`);
-        const name = input.value.trim();
-        if (!name) return;
-        btn.disabled = true;
-        await sb.from("members").insert({ unit_id: unitId, name, pin: genPin() });
-        btn.disabled = false;
-        await renderRoster();
-      });
-    });
-    main.querySelectorAll("[data-newname]").forEach(input => {
-      input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") main.querySelector(`[data-addmember="${input.getAttribute("data-newname")}"]`).click();
-      });
-    });
+    main.querySelectorAll("[data-rename]").forEach(i => i.addEventListener("change", async () => {
+      await sb.from("units").update({ name:i.value.trim() }).eq("id", i.getAttribute("data-rename"));
+    }));
+    main.querySelectorAll("[data-showpin]").forEach(s => s.addEventListener("click", () => {
+      s.textContent = s.textContent === "••••" ? s.getAttribute("data-pin") : "••••";
+    }));
+    main.querySelectorAll("[data-removemember]").forEach(b => b.addEventListener("click", async () => {
+      await sb.from("members").delete().eq("id", b.getAttribute("data-removemember"));
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-addmember]").forEach(b => b.addEventListener("click", async () => {
+      const unitId = b.getAttribute("data-addmember");
+      const input = main.querySelector(`[data-newname="${unitId}"]`);
+      const name = input.value.trim(); if (!name) return;
+      b.disabled = true;
+      await sb.from("members").insert({ unit_id:unitId, name, pin:genPin() });
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-newname]").forEach(i => i.addEventListener("keydown", e => {
+      if (e.key === "Enter") main.querySelector(`[data-addmember="${i.getAttribute("data-newname")}"]`).click();
+    }));
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  // ---------- Duty ----------
+  async function loadAttendance(dateISO) {
+    const { data } = await sb.from("attendance").select("*").eq("date", dateISO);
+    return data || [];
+  }
+  async function upsertAttendance(memberId, dateISO, patch) {
+    const { data: existing } = await sb.from("attendance").select("*").eq("member_id", memberId).eq("date", dateISO).maybeSingle();
+    if (existing) {
+      await sb.from("attendance").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", existing.id);
+    } else {
+      await sb.from("attendance").insert({ member_id: memberId, date: dateISO, ...patch });
+    }
+  }
+
+  async function renderDuty() {
+    const main = document.getElementById("main");
+    main.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
+    const records = await loadAttendance(currentDate);
+    const onDutyUnitId = getOnDutyUnitId(UNITS, ROTATION, currentDate);
+    const onDutyUnit = UNITS.find(u => u.id === onDutyUnitId) || UNITS[0];
+    const offDutyUnit = UNITS.find(u => u.id !== onDutyUnitId) || UNITS[1];
+    const members = MEMBERS.filter(m => m.unit_id === onDutyUnitId);
+    const recByMember = {};
+    records.forEach(r => recByMember[r.member_id] = r);
+    const now = new Date();
+    const isToday = currentDate === todayISO();
+
+    main.innerHTML = `
+      <div class="dateBar">
+        <button class="iconbtn" data-prevday>›</button>
+        <div style="text-align:center">
+          <div class="dateMain">${dayNameAr(currentDate)} — ${monthNameAr(currentDate)}</div>
+          ${!isToday ? `<button class="linkbtn" data-today>العودة لليوم</button>` : ""}
+        </div>
+        <button class="iconbtn" data-nextday>‹</button>
+      </div>
+      <div class="dutyBanner">
+        <div><div class="dutyLabel">السرية المناوبة هذا الأسبوع</div><div class="dutyUnit">${escapeHtml(onDutyUnit?.name||"")}</div></div>
+        <div style="text-align:left"><div style="font-size:12px;color:#8A97A8">مستريحة</div><div style="font-size:13px;color:#8A97A8">${escapeHtml(offDutyUnit?.name||"")}</div></div>
+      </div>
+      ${members.length === 0 ? `<div class="empty">لا يوجد أفراد بـ${escapeHtml(onDutyUnit?.name||"")} بعد — أضفهم من تبويب «الطاقم».</div>` : ""}
+      <div class="shiftGrid">
+        ${SHIFTS.map(shift => {
+          const shiftMembers = members.filter(m => recByMember[m.id]?.shift === shift.id);
+          const unassigned = members.filter(m => !recByMember[m.id]?.shift);
+          return `
+            <div class="shiftCard">
+              <div class="shiftHeader" style="color:${shift.color}"><span>${shift.label}</span><span style="font-size:12px;color:#8A97A8">${shift.range}</span></div>
+              ${shiftMembers.length===0 ? `<div style="color:#5B6779;font-size:12px;padding:6px 0">لا يوجد أفراد مسندون</div>` : ""}
+              ${shiftMembers.map(m => renderMemberRow(m, recByMember[m.id], shift, now, isToday)).join("")}
+              ${unassigned.length>0 ? `
+                <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #2A3547">
+                  <div style="font-size:12px;color:#8A97A8;margin-bottom:6px">إسناد فرد لهذه النوبة:</div>
+                  ${unassigned.map(m => `<button class="assignChip" data-assign="${m.id}" data-shift="${shift.id}">+ ${escapeHtml(m.name)}</button>`).join("")}
+                </div>
+              ` : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+
+    document.querySelector("[data-prevday]").onclick = () => { currentDate = addDays(currentDate, -1); renderDuty(); };
+    document.querySelector("[data-nextday]").onclick = () => { currentDate = addDays(currentDate, 1); renderDuty(); };
+    const todayBtn = document.querySelector("[data-today]");
+    if (todayBtn) todayBtn.onclick = () => { currentDate = todayISO(); renderDuty(); };
+
+    main.querySelectorAll("[data-assign]").forEach(btn => btn.addEventListener("click", async () => {
+      const memberId = btn.getAttribute("data-assign");
+      const shift = btn.getAttribute("data-shift");
+      await upsertAttendance(memberId, currentDate, { shift });
+      renderDuty();
+    }));
+    main.querySelectorAll("[data-unassign]").forEach(btn => btn.addEventListener("click", async () => {
+      await upsertAttendance(btn.getAttribute("data-unassign"), currentDate, { shift: null });
+      renderDuty();
+    }));
+    main.querySelectorAll("[data-status]").forEach(btn => btn.addEventListener("click", async () => {
+      const memberId = btn.getAttribute("data-memberid");
+      const status = btn.getAttribute("data-status");
+      if (status === "present") { renderDuty(); openVerify(memberId); return; }
+      await upsertAttendance(memberId, currentDate, { status, verified:false, geo:null, time_in:null });
+      renderDuty();
+    }));
+    main.querySelectorAll("[data-timein]").forEach(inp => inp.addEventListener("change", async () => {
+      await upsertAttendance(inp.getAttribute("data-timein"), currentDate, { time_in: inp.value });
+      renderDuty();
+    }));
+    main.querySelectorAll("[data-startverify]").forEach(btn => btn.addEventListener("click", () => openVerify(btn.getAttribute("data-startverify"))));
+  }
+
+  function renderMemberRow(member, rec, shift, now, isToday) {
+    const status = rec?.status;
+    let progressHtml = "";
+    if (status === "present" && rec?.time_in && isToday) {
+      const [h,m] = rec.time_in.split(":").map(Number);
+      const start = new Date(now); start.setHours(h,m,0,0);
+      const elapsed = now - start; const total = 8*3600*1000;
+      const pct = Math.max(0, Math.min(1, elapsed/total));
+      const done = elapsed >= total;
+      const doneAt = new Date(start.getTime()+total);
+      progressHtml = `
+        <div style="margin-top:6px">
+          <div style="height:6px;background:#1E2B41;border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${pct*100}%;background:${done?'#2FAE60':shift.color}"></div>
+          </div>
+          <div style="font-size:11px;color:${done?'#2FAE60':'#8A97A8'};margin-top:3px">
+            ${done ? "أنهى النوبة ✅ (٨ ساعات)" : `قيد النوبة — تنتهي حوالي ${pad(doneAt.getHours())}:${pad(doneAt.getMinutes())}`}
+          </div>
+        </div>`;
+    }
+    let geoHtml = "";
+    if (status === "present" && rec?.geo) {
+      geoHtml = `<a class="geoLink" href="https://www.google.com/maps?q=${rec.geo.lat},${rec.geo.lng}" target="_blank">📍 موقع الحضور على الخريطة (دقة ~${rec.geo.accuracy} م)</a>`;
+    } else if (status === "present" && rec?.verified) {
+      geoHtml = `<div class="geoNote">لم يتم تحديد الموقع (رفض الإذن أو غير متاح)</div>`;
+    }
+    return `
+      <div class="memberRow" id="row-${member.id}">
+        <div class="memberRowTop">
+          <span>${escapeHtml(member.name)}</span>
+          <button class="xbtn" data-unassign="${member.id}">🗑️</button>
+        </div>
+        <div class="pillsRow">
+          <button class="pill ${status==='present'?'active':''}" data-status="present" data-memberid="${member.id}" style="border-color:${STATUS.present.color};${status==='present'?`background:${STATUS.present.color}`:''}">حاضر</button>
+          ${Object.entries(STATUS).filter(([k])=>k!=='present').map(([k,s]) => `
+            <button class="pill ${status===k?'active':''}" data-status="${k}" data-memberid="${member.id}" style="border-color:${s.color};${status===k?`background:${s.color}`:''}">${s.label}</button>
+          `).join("")}
+        </div>
+        <div id="verifyHolder-${member.id}"></div>
+        ${status === "present" ? `
+          <div class="timeRow">
+            🕐 وقت الحضور
+            <input type="time" value="${rec.time_in||''}" data-timein="${member.id}" />
+            ${rec.verified ? `<span style="color:#2FAE60">✔ مؤكد بالرمز</span>` : ""}
+          </div>
+          ${geoHtml}
+          ${progressHtml}
+        ` : ""}
+      </div>
+    `;
+  }
+
+  function openVerify(memberId) {
+    const holder = document.getElementById(`verifyHolder-${memberId}`);
+    if (!holder) return;
+    holder.innerHTML = `
+      <div class="verifyBox">
+        🔑
+        <input type="password" inputmode="numeric" placeholder="رمز الفرد" id="pinInput-${memberId}" />
+        <button class="miniBtn" id="pinConfirm-${memberId}">تأكيد</button>
+        <button class="miniBtnGhost" id="pinCancel-${memberId}">إلغاء</button>
+      </div>
+    `;
+    document.getElementById(`pinCancel-${memberId}`).onclick = () => { holder.innerHTML = ""; };
+    document.getElementById(`pinConfirm-${memberId}`).onclick = async () => {
+      const val = document.getElementById(`pinInput-${memberId}`).value;
+      const member = MEMBERS.find(m => m.id === memberId);
+      if (val !== member.pin) {
+        document.getElementById(`pinInput-${memberId}`).style.borderColor = "#D64545";
+        return;
+      }
+      const btn = document.getElementById(`pinConfirm-${memberId}`);
+      btn.disabled = true; btn.textContent = "...جارِ تحديد الموقع";
+      const geo = await getGeo();
+      const now = new Date();
+      const hh = pad(now.getHours()), mm = pad(now.getMinutes());
+      await upsertAttendance(memberId, currentDate, { status:"present", verified:true, geo, time_in: hh+":"+mm });
+      renderDuty();
+    };
+  }
+
+  function getGeo() {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat:+pos.coords.latitude.toFixed(5), lng:+pos.coords.longitude.toFixed(5), accuracy:Math.round(pos.coords.accuracy) }),
+        () => resolve(null),
+        { enableHighAccuracy:true, timeout:8000, maximumAge:0 }
+      );
+    });
   }
 
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
-    if (session) renderApp();
+    if (session) await bootApp();
     else renderLogin();
   })();
 </script>
