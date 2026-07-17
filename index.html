@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سجلّ الدوام</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; font-family: 'Tahoma', sans-serif; }
+  body { margin:0; min-height:100vh; background:#0F1720; color:#E7ECF2; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .card { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:24px; width:100%; max-width:360px; text-align:center; }
+  h1 { font-size:18px; margin-bottom:6px; }
+  p { color:#8A97A8; font-size:13px; margin-bottom:20px; }
+  input { width:100%; background:#0F1720; border:1px solid #2A3547; color:#E7ECF2; border-radius:8px; padding:10px 12px; font-size:14px; margin-bottom:10px; }
+  button { width:100%; background:#E3A008; border:none; color:#0F1720; font-weight:800; border-radius:8px; padding:11px; font-size:14px; cursor:pointer; }
+  button:disabled { opacity:.6; }
+  .err { color:#D64545; font-size:12px; margin-top:8px; }
+  .ok { color:#2FAE60; font-size:13px; }
+  .logout { background:none; border:1px solid #3A4658; color:#C7D0DC; margin-top:16px; }
+</style>
+</head>
+<body>
+  <div class="card" id="app">...جارِ التحميل</div>
+
+<script>
+  const SUPABASE_URL = "https://zlcbmgaamyxwbhautvah.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsY2JtZ2FhbXl4d2JoYXV0dmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMjYxNDYsImV4cCI6MjA5OTgwMjE0Nn0.uGTm3TOgl72gbv3z1_BvxkpysNwIAyuCTJhCb70nkwE";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const app = document.getElementById("app");
+
+  function renderLogin(errMsg) {
+    app.innerHTML = `
+      <h1>سجلّ الدوام</h1>
+      <p>سجّل الدخول بحسابك للمتابعة</p>
+      <input id="email" type="email" placeholder="الإيميل" />
+      <input id="password" type="password" placeholder="كلمة السر" />
+      <button id="loginBtn">دخول</button>
+      ${errMsg ? `<div class="err">${errMsg}</div>` : ""}
+    `;
+    document.getElementById("loginBtn").onclick = async () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const btn = document.getElementById("loginBtn");
+      btn.disabled = true; btn.textContent = "...";
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) { renderLogin(error.message); return; }
+      renderDashboard();
+    };
+  }
+
+  async function renderDashboard() {
+    const { data: { user } } = await sb.auth.getUser();
+    app.innerHTML = `
+      <h1>أهلًا 👋</h1>
+      <p class="ok">تسجيل الدخول شغال تمام!</p>
+      <p style="color:#C7D0DC">${user.email}</p>
+      <button class="logout" id="logoutBtn">تسجيل خروج</button>
+    `;
+    document.getElementById("logoutBtn").onclick = async () => {
+      await sb.auth.signOut();
+      renderLogin();
+    };
+  }
+
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) renderDashboard();
+    else renderLogin();
+  })();
+</script>
+</body>
+</html>
