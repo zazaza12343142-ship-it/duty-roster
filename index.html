@@ -7,20 +7,35 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   * { box-sizing: border-box; font-family: 'Tahoma', sans-serif; }
-  body { margin:0; min-height:100vh; background:#0F1720; color:#E7ECF2; display:flex; align-items:center; justify-content:center; padding:20px; }
+  body { margin:0; min-height:100vh; background:#0F1720; color:#E7ECF2; }
+  .center { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
   .card { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:24px; width:100%; max-width:360px; text-align:center; }
-  h1 { font-size:18px; margin-bottom:6px; }
+  h1 { font-size:18px; margin:0 0 6px; }
   p { color:#8A97A8; font-size:13px; margin-bottom:20px; }
   input { width:100%; background:#0F1720; border:1px solid #2A3547; color:#E7ECF2; border-radius:8px; padding:10px 12px; font-size:14px; margin-bottom:10px; }
-  button { width:100%; background:#E3A008; border:none; color:#0F1720; font-weight:800; border-radius:8px; padding:11px; font-size:14px; cursor:pointer; }
+  button { background:#E3A008; border:none; color:#0F1720; font-weight:800; border-radius:8px; padding:11px 16px; font-size:14px; cursor:pointer; }
   button:disabled { opacity:.6; }
   .err { color:#D64545; font-size:12px; margin-top:8px; }
   .ok { color:#2FAE60; font-size:13px; }
-  .logout { background:none; border:1px solid #3A4658; color:#C7D0DC; margin-top:16px; }
+  .ghost { background:none; border:1px solid #3A4658; color:#C7D0DC; }
+  .danger { background:none; border:1px solid #D64545; color:#D64545; padding:6px 10px; font-size:12px; }
+  header { position:sticky; top:0; background:#0F1720ee; backdrop-filter:blur(6px); border-bottom:1px solid #1E2B41; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; z-index:10; }
+  .brand { font-weight:800; font-size:16px; }
+  main { max-width:900px; margin:0 auto; padding:16px; }
+  .rosterGrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:14px; }
+  .unitCard { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:16px; }
+  .unitTitle { font-weight:800; font-size:17px; margin-bottom:4px; background:transparent; border:none; border-bottom:2px solid #2A3547; color:#E7ECF2; width:100%; padding:4px 2px; }
+  .memberRow { display:flex; justify-content:space-between; align-items:center; background:#0F1720; border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:13.5px; }
+  .pinTag { font-size:11px; color:#8A97A8; background:#141F2E; border-radius:6px; padding:3px 7px; cursor:pointer; margin-inline-start:8px; }
+  .addRow { display:flex; gap:6px; margin-top:10px; }
+  .addRow input { margin-bottom:0; flex:1; }
+  .xbtn { background:none; border:none; color:#5B6779; cursor:pointer; font-size:14px; padding:2px 6px; }
+  .empty { color:#5B6779; font-size:13px; padding:10px 0; }
+  .loading { color:#8A97A8; text-align:center; padding:40px; }
 </style>
 </head>
 <body>
-  <div class="card" id="app">...جارِ التحميل</div>
+<div id="app"><div class="loading">...جارِ التحميل</div></div>
 
 <script>
   const SUPABASE_URL = "https://zlcbmgaamyxwbhautvah.supabase.co";
@@ -28,14 +43,18 @@
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const app = document.getElementById("app");
 
+  const genPin = () => String(Math.floor(1000 + Math.random() * 9000));
+
   function renderLogin(errMsg) {
     app.innerHTML = `
-      <h1>سجلّ الدوام</h1>
-      <p>سجّل الدخول بحسابك للمتابعة</p>
-      <input id="email" type="email" placeholder="الإيميل" />
-      <input id="password" type="password" placeholder="كلمة السر" />
-      <button id="loginBtn">دخول</button>
-      ${errMsg ? `<div class="err">${errMsg}</div>` : ""}
+      <div class="center"><div class="card">
+        <h1>سجلّ الدوام</h1>
+        <p>سجّل الدخول بحسابك للمتابعة</p>
+        <input id="email" type="email" placeholder="الإيميل" />
+        <input id="password" type="password" placeholder="كلمة السر" />
+        <button id="loginBtn" style="width:100%">دخول</button>
+        ${errMsg ? `<div class="err">${errMsg}</div>` : ""}
+      </div></div>
     `;
     document.getElementById("loginBtn").onclick = async () => {
       const email = document.getElementById("email").value.trim();
@@ -44,27 +63,131 @@
       btn.disabled = true; btn.textContent = "...";
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) { renderLogin(error.message); return; }
-      renderDashboard();
+      renderApp();
     };
   }
 
-  async function renderDashboard() {
+  async function ensureDefaultUnits() {
+    const { data, error } = await sb.from("units").select("*").order("name");
+    if (error) { console.error(error); return []; }
+    if (data.length === 0) {
+      const { data: inserted, error: insErr } = await sb.from("units")
+        .insert([{ name: "السرية الأولى" }, { name: "السرية الثانية" }])
+        .select();
+      if (insErr) { console.error(insErr); return []; }
+      return inserted;
+    }
+    return data;
+  }
+
+  async function loadMembers(unitIds) {
+    const { data, error } = await sb.from("members").select("*").in("unit_id", unitIds).order("created_at");
+    if (error) { console.error(error); return []; }
+    return data;
+  }
+
+  async function renderApp() {
     const { data: { user } } = await sb.auth.getUser();
+    if (!user) { renderLogin(); return; }
+
     app.innerHTML = `
-      <h1>أهلًا 👋</h1>
-      <p class="ok">تسجيل الدخول شغال تمام!</p>
-      <p style="color:#C7D0DC">${user.email}</p>
-      <button class="logout" id="logoutBtn">تسجيل خروج</button>
+      <header>
+        <div class="brand">🛡️ سجلّ الدوام</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:12px;color:#8A97A8">${user.email}</span>
+          <button class="ghost" id="logoutBtn" style="padding:6px 10px;font-size:12px">خروج</button>
+        </div>
+      </header>
+      <main id="main"><div class="loading">...جارِ تحميل الطاقم</div></main>
     `;
     document.getElementById("logoutBtn").onclick = async () => {
       await sb.auth.signOut();
       renderLogin();
     };
+
+    await renderRoster();
+  }
+
+  async function renderRoster() {
+    const main = document.getElementById("main");
+    const units = await ensureDefaultUnits();
+    const members = await loadMembers(units.map(u => u.id));
+
+    main.innerHTML = `
+      <div class="rosterGrid">
+        ${units.map(u => `
+          <div class="unitCard" data-unit="${u.id}">
+            <input class="unitTitle" data-rename="${u.id}" value="${escapeHtml(u.name)}" />
+            <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">
+              ${members.filter(m => m.unit_id === u.id).length} فرد
+            </div>
+            <div class="memberList">
+              ${members.filter(m => m.unit_id === u.id).map(m => `
+                <div class="memberRow">
+                  <span>${escapeHtml(m.name)}</span>
+                  <span>
+                    <span class="pinTag" data-showpin="${m.id}" data-pin="${m.pin}">••••</span>
+                    <button class="xbtn" data-removemember="${m.id}">🗑️</button>
+                  </span>
+                </div>
+              `).join("") || `<div class="empty">لا يوجد أفراد بعد</div>`}
+            </div>
+            <div class="addRow">
+              <input type="text" placeholder="اسم الفرد الجديد" data-newname="${u.id}" />
+              <button data-addmember="${u.id}">إضافة</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+
+    main.querySelectorAll("[data-rename]").forEach(input => {
+      input.addEventListener("change", async () => {
+        const id = input.getAttribute("data-rename");
+        await sb.from("units").update({ name: input.value.trim() }).eq("id", id);
+      });
+    });
+
+    main.querySelectorAll("[data-showpin]").forEach(span => {
+      span.addEventListener("click", () => {
+        span.textContent = span.textContent === "••••" ? span.getAttribute("data-pin") : "••••";
+      });
+    });
+
+    main.querySelectorAll("[data-removemember]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-removemember");
+        await sb.from("members").delete().eq("id", id);
+        await renderRoster();
+      });
+    });
+
+    main.querySelectorAll("[data-addmember]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const unitId = btn.getAttribute("data-addmember");
+        const input = main.querySelector(`[data-newname="${unitId}"]`);
+        const name = input.value.trim();
+        if (!name) return;
+        btn.disabled = true;
+        await sb.from("members").insert({ unit_id: unitId, name, pin: genPin() });
+        btn.disabled = false;
+        await renderRoster();
+      });
+    });
+    main.querySelectorAll("[data-newname]").forEach(input => {
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") main.querySelector(`[data-addmember="${input.getAttribute("data-newname")}"]`).click();
+      });
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
-    if (session) renderDashboard();
+    if (session) renderApp();
     else renderLogin();
   })();
 </script>
