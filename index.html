@@ -57,6 +57,15 @@
   .timeRow input[type=time] { width:auto; margin:0; padding:3px 6px; font-size:12px; }
   .geoLink { font-size:11px; color:#3B82C4; display:block; margin-top:4px; }
   .geoNote { font-size:11px; color:#5B6779; margin-top:4px; }
+  .formCard { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:16px; margin-bottom:16px; }
+  .formRow { display:flex; gap:8px; flex-wrap:wrap; }
+  .formRow > * { flex:1; min-width:140px; }
+  .reqCard { background:#141F2E; border:1px solid #1E2B41; border-radius:12px; padding:14px; margin-bottom:8px; }
+  .reqTop { display:flex; justify-content:space-between; align-items:flex-start; }
+  .reqBottom { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
+  .badge { font-size:12px; border-radius:20px; padding:3px 10px; border:1px solid; }
+  .approveBtn { background:#0F2A1B; border:1px solid #2FAE60; color:#2FAE60; border-radius:6px; padding:6px 10px; font-size:12px; font-weight:700; }
+  .rejectBtn { background:#2A1414; border:1px solid #D64545; color:#D64545; border-radius:6px; padding:6px 10px; font-size:12px; font-weight:700; }
 </style>
 </head>
 <body>
@@ -90,6 +99,7 @@
     leave:{label:"إجازة",color:"#3B82C4"}, travel:{label:"سفر",color:"#7C6FE0"},
     excuse:{label:"عذر",color:"#E3A008"}, sick:{label:"مرض",color:"#C4643B"},
   };
+  const REQUEST_TYPES = ["sick","travel","leave","excuse"];
 
   let UNITS = [], MEMBERS = [], ROTATION = null;
   let currentTab = "roster";
@@ -161,6 +171,7 @@
         </div>
         <div class="tabs">
           <button class="tabBtn" data-tab="duty">الدوام اليومي</button>
+          <button class="tabBtn" data-tab="requests">الطلبات</button>
           <button class="tabBtn" data-tab="roster">الطاقم</button>
         </div>
       </header>
@@ -179,6 +190,7 @@
   function render() {
     document.querySelectorAll(".tabBtn").forEach(b => b.classList.toggle("active", b.getAttribute("data-tab") === currentTab));
     if (currentTab === "roster") renderRoster();
+    else if (currentTab === "requests") renderRequestsTab();
     else renderDuty();
   }
 
@@ -421,11 +433,102 @@
     });
   }
 
-  (async () => {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) await bootApp();
-    else renderLogin();
-  })();
+  // ---------- Requests ----------
+  async function loadRequests() {
+    const { data } = await sb.from("requests").select("*").order("created_at", { ascending:false });
+    return data || [];
+  }
+  function fmtDateAr(iso) { return `${dayNameAr(iso)} — ${monthNameAr(iso)}`; }
+
+  async function renderRequestsTab() {
+    const main = document.getElementById("main");
+    main.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
+    const requests = await loadRequests();
+    const allMembers = MEMBERS.map(m => ({ ...m, unitName: (UNITS.find(u=>u.id===m.unit_id)||{}).name || "" }));
+
+    main.innerHTML = `
+      <div class="formCard">
+        <div style="font-weight:800;margin-bottom:10px">طلب غياب جديد (مرض / سفر / إجازة / عذر)</div>
+        <div class="formRow">
+          <select id="reqMember">
+            <option value="">اختر الفرد</option>
+            ${allMembers.map(m => `<option value="${m.id}">${escapeHtml(m.name)} — ${escapeHtml(m.unitName)}</option>`).join("")}
+          </select>
+          <input type="date" id="reqDate" value="${todayISO()}" />
+          <select id="reqType">
+            ${REQUEST_TYPES.map(t => `<option value="${t}">${STATUS[t].label}</option>`).join("")}
+          </select>
+        </div>
+        <input type="text" id="reqNote" placeholder="ملاحظة / سبب (اختياري)" style="margin-top:8px" />
+        <button id="reqSubmit" style="margin-top:10px">إرسال الطلب</button>
+        <div id="reqErr" class="err"></div>
+      </div>
+      <div id="reqList">
+        ${requests.length === 0 ? `<div class="empty">لا يوجد طلبات بعد</div>` : requests.map(r => renderRequestCard(r, allMembers)).join("")}
+      </div>
+    `;
+
+    document.getElementById("reqSubmit").onclick = async () => {
+      const memberId = document.getElementById("reqMember").value;
+      const date = document.getElementById("reqDate").value;
+      const type = document.getElementById("reqType").value;
+      const note = document.getElementById("reqNote").value.trim();
+      const errEl = document.getElementById("reqErr");
+      if (!memberId) { errEl.textContent = "اختر الفرد أولًا"; return; }
+      errEl.textContent = "";
+      const btn = document.getElementById("reqSubmit");
+      btn.disabled = true;
+      await sb.from("requests").insert({ member_id: memberId, date, type, note, status:"pending" });
+      btn.disabled = false;
+      renderRequestsTab();
+    };
+
+    main.querySelectorAll("[data-approve]").forEach(btn => btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-approve");
+      const req = requests.find(r => r.id === id);
+      await sb.from("requests").update({ status:"approved", decided_at: new Date().toISOString() }).eq("id", id);
+      await upsertAttendance(req.member_id, req.date, { status: req.type, verified:false });
+      renderRequestsTab();
+    }));
+    main.querySelectorAll("[data-reject]").forEach(btn => btn.addEventListener("click", async () => {
+      await sb.from("requests").update({ status:"rejected", decided_at: new Date().toISOString() }).eq("id", btn.getAttribute("data-reject"));
+      renderRequestsTab();
+    }));
+    main.querySelectorAll("[data-delreq]").forEach(btn => btn.addEventListener("click", async () => {
+      await sb.from("requests").delete().eq("id", btn.getAttribute("data-delreq"));
+      renderRequestsTab();
+    }));
+  }
+
+  function renderRequestCard(r, allMembers) {
+    const member = allMembers.find(m => m.id === r.member_id);
+    const s = STATUS[r.type];
+    const badgeMap = { pending:{c:"#E3A008",t:"بانتظار الموافقة"}, approved:{c:"#2FAE60",t:"مُوافَق عليه"}, rejected:{c:"#D64545",t:"مرفوض"} };
+    const b = badgeMap[r.status];
+    return `
+      <div class="reqCard">
+        <div class="reqTop">
+          <div>
+            <div style="font-weight:700">${escapeHtml(member?.name || "(محذوف)")}</div>
+            <div style="font-size:12px;color:#8A97A8">${fmtDateAr(r.date)}</div>
+            ${r.note ? `<div style="font-size:12px;color:#C7D0DC;margin-top:3px">${escapeHtml(r.note)}</div>` : ""}
+          </div>
+          <div style="color:${s.color};font-weight:700;font-size:13px">${s.label}</div>
+        </div>
+        <div class="reqBottom">
+          <span class="badge" style="color:${b.c};border-color:${b.c}">${b.t}</span>
+          ${r.status === "pending" ? `
+            <div style="display:flex;gap:6px">
+              <button class="approveBtn" data-approve="${r.id}">✔ موافقة</button>
+              <button class="rejectBtn" data-reject="${r.id}">✕ رفض</button>
+            </div>
+          ` : `<button class="xbtn" data-delreq="${r.id}">🗑️</button>`}
+        </div>
+      </div>
+    `;
+  }
+
+
 </script>
 </body>
 </html>
