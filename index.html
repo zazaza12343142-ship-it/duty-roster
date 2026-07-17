@@ -528,6 +528,11 @@
     `;
   }
 
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) await bootApp();
+    else renderLogin();
+  })();
 
 </script>
 </body>
