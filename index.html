@@ -362,9 +362,9 @@
           <button class="xbtn" data-unassign="${member.id}">🗑️</button>
         </div>
         <div class="pillsRow">
-          <button class="pill ${status==='present'?'active':''}" data-status="present" data-memberid="${member.id}" style="border-color:${STATUS.present.color};${status==='present'?`background:${STATUS.present.color}`:''}">حاضر</button>
+          <button class="pill ${status==='present'?'active':''}" data-status="present" data-memberid="${member.id}" style="border-color:${STATUS.present.color};color:${status==='present'?'#0F1720':STATUS.present.color};${status==='present'?`background:${STATUS.present.color}`:''}">حاضر</button>
           ${Object.entries(STATUS).filter(([k])=>k!=='present').map(([k,s]) => `
-            <button class="pill ${status===k?'active':''}" data-status="${k}" data-memberid="${member.id}" style="border-color:${s.color};${status===k?`background:${s.color}`:''}">${s.label}</button>
+            <button class="pill ${status===k?'active':''}" data-status="${k}" data-memberid="${member.id}" style="border-color:${s.color};color:${status===k?'#0F1720':s.color};${status===k?`background:${s.color}`:''}">${s.label}</button>
           `).join("")}
         </div>
         <div id="verifyHolder-${member.id}"></div>
