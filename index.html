@@ -222,6 +222,12 @@
 
   // ---------- Roster ----------
   async function refreshRosterData() { await refreshHierarchy(); }
+  async function rerenderRosterKeepScroll() {
+    const y = window.scrollY;
+    await refreshRosterData();
+    renderRoster();
+    window.scrollTo(0, y);
+  }
 
   function renderRoster() {
     const main = document.getElementById("main");
@@ -281,7 +287,7 @@
           <button class="xbtn" data-delplatoon="${p.id}">🗑️</button>
         </div>
         <div class="cmdRow">
-          👤 قائد الفصيلة:
+          👤 قائد فصيلة «${escapeHtml(p.name)}»:
           <select data-platooncmd="${p.id}">
             <option value="">— بدون —</option>
             ${unitMembers.map(m => `<option value="${m.id}" ${m.id===p.commander_member_id?"selected":""}>${escapeHtml(m.name)}</option>`).join("")}
@@ -303,7 +309,7 @@
           <button class="xbtn" data-delsquad="${s.id}">🗑️</button>
         </div>
         <div class="cmdRow">
-          👤 قائد المجموعة:
+          👤 قائد مجموعة «${escapeHtml(s.name)}» (فصيلة ${escapeHtml(platoon.name)}):
           <select data-squadcmd="${s.id}">
             <option value="">— بدون —</option>
             ${unitMembers.map(m => `<option value="${m.id}" ${m.id===s.commander_member_id?"selected":""}>${escapeHtml(m.name)}</option>`).join("")}
@@ -331,29 +337,29 @@
   function wireRosterEvents(main) {
     main.querySelectorAll("[data-rename]").forEach(i => i.addEventListener("change", async () => {
       await sb.from("units").update({ name:i.value.trim() }).eq("id", i.getAttribute("data-rename"));
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-renameplatoon]").forEach(i => i.addEventListener("change", async () => {
       await sb.from("platoons").update({ name:i.value.trim() }).eq("id", i.getAttribute("data-renameplatoon"));
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-renamesquad]").forEach(i => i.addEventListener("change", async () => {
       await sb.from("squads").update({ name:i.value.trim() }).eq("id", i.getAttribute("data-renamesquad"));
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-showpin]").forEach(s => s.addEventListener("click", () => {
       s.textContent = s.textContent === "••••" ? s.getAttribute("data-pin") : "••••";
     }));
     main.querySelectorAll("[data-removemember]").forEach(b => b.addEventListener("click", async () => {
       await sb.from("members").delete().eq("id", b.getAttribute("data-removemember"));
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-addmember]").forEach(b => b.addEventListener("click", async () => {
       const unitId = b.getAttribute("data-addmember");
       const input = main.querySelector(`[data-newname="${unitId}"]`);
       const name = input.value.trim(); if (!name) return;
       await sb.from("members").insert({ unit_id:unitId, name, pin:genPin() });
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-newname]").forEach(i => i.addEventListener("keydown", e => {
       if (e.key === "Enter") main.querySelector(`[data-addmember="${i.getAttribute("data-newname")}"]`).click();
@@ -362,40 +368,40 @@
       const name = prompt("اسم الفصيلة الجديدة:", "الفصيلة");
       if (!name) return;
       await sb.from("platoons").insert({ unit_id: b.getAttribute("data-addplatoon"), name: name.trim() });
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-delplatoon]").forEach(b => b.addEventListener("click", async () => {
       if (!confirm("حذف الفصيلة وكل مجموعاتها؟ الأفراد رح يرجعوا غير مصنّفين.")) return;
       await sb.from("platoons").delete().eq("id", b.getAttribute("data-delplatoon"));
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-addsquad]").forEach(b => b.addEventListener("click", async () => {
       const name = prompt("اسم المجموعة الجديدة:", "المجموعة");
       if (!name) return;
       await sb.from("squads").insert({ platoon_id: b.getAttribute("data-addsquad"), name: name.trim() });
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-delsquad]").forEach(b => b.addEventListener("click", async () => {
       if (!confirm("حذف المجموعة؟ الأفراد رح يرجعوا غير مصنّفين.")) return;
       await sb.from("squads").delete().eq("id", b.getAttribute("data-delsquad"));
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-platooncmd]").forEach(sel => sel.addEventListener("change", async () => {
       await sb.from("platoons").update({ commander_member_id: sel.value || null }).eq("id", sel.getAttribute("data-platooncmd"));
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-squadcmd]").forEach(sel => sel.addEventListener("change", async () => {
       await sb.from("squads").update({ commander_member_id: sel.value || null }).eq("id", sel.getAttribute("data-squadcmd"));
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-assignsquad]").forEach(sel => sel.addEventListener("change", async () => {
       if (!sel.value) return;
       await sb.from("members").update({ squad_id: sel.value }).eq("id", sel.getAttribute("data-assignsquad"));
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-unassignsquad]").forEach(b => b.addEventListener("click", async () => {
       await sb.from("members").update({ squad_id: null }).eq("id", b.getAttribute("data-unassignsquad"));
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-addmembersquad]").forEach(b => b.addEventListener("click", async () => {
       const squadId = b.getAttribute("data-addmembersquad");
@@ -403,7 +409,7 @@
       const input = main.querySelector(`[data-newnamesquad="${squadId}"]`);
       const name = input.value.trim(); if (!name) return;
       await sb.from("members").insert({ unit_id:unitId, squad_id:squadId, name, pin:genPin() });
-      await refreshRosterData(); renderRoster();
+      await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-newnamesquad]").forEach(i => i.addEventListener("keydown", e => {
       if (e.key === "Enter") main.querySelector(`[data-addmembersquad="${i.getAttribute("data-newnamesquad")}"]`).click();
