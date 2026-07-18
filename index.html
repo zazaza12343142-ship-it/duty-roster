@@ -286,12 +286,15 @@
           <input class="unitTitle" data-renameplatoon="${p.id}" value="${escapeHtml(p.name)}" />
           <button class="xbtn" data-delplatoon="${p.id}">🗑️</button>
         </div>
-        <div class="cmdRow">
-          👤 قائد فصيلة «${escapeHtml(p.name)}»:
-          <select data-platooncmd="${p.id}">
-            <option value="">— بدون —</option>
-            ${unitMembers.map(m => `<option value="${m.id}" ${m.id===p.commander_member_id?"selected":""}>${escapeHtml(m.name)}</option>`).join("")}
-          </select>
+        <div class="cmdRow" style="flex-wrap:wrap">
+          🎖️ قائد فصيلة «${escapeHtml(p.name)}»:
+          ${commander ? `
+            <b style="color:#F0C94A">${escapeHtml(commander.name)}</b>
+            <button class="smallBtn" data-removeplatooncmd="${p.id}">إزالة</button>
+          ` : `
+            <input type="text" placeholder="اسم قائد الفصيلة" data-newplatooncmdname="${p.id}" style="flex:1;min-width:120px;margin:0;padding:5px 6px;font-size:12px" />
+            <button class="smallBtn" data-setplatooncmdnew="${p.id}" data-unitforplatooncmd="${unit.id}">تعيين</button>
+          `}
         </div>
         ${squads.map(s => renderSquadBlock(s, p, unit)).join("")}
         <button class="smallBtn" data-addsquad="${p.id}">+ إضافة مجموعة</button>
@@ -301,7 +304,7 @@
 
   function renderSquadBlock(s, platoon, unit) {
     const squadMembers = MEMBERS.filter(m => m.squad_id === s.id);
-    const unitMembers = MEMBERS.filter(m => m.unit_id === unit.id);
+    const commander = squadMembers.find(m => m.id === s.commander_member_id);
     return `
       <div class="squadCard">
         <div class="squadHead">
@@ -309,17 +312,14 @@
           <button class="xbtn" data-delsquad="${s.id}">🗑️</button>
         </div>
         <div class="cmdRow">
-          👤 قائد مجموعة «${escapeHtml(s.name)}» (فصيلة ${escapeHtml(platoon.name)}):
-          <select data-squadcmd="${s.id}">
-            <option value="">— بدون —</option>
-            ${unitMembers.map(m => `<option value="${m.id}" ${m.id===s.commander_member_id?"selected":""}>${escapeHtml(m.name)}</option>`).join("")}
-          </select>
+          ⭐ قائد مجموعة «${escapeHtml(s.name)}»: ${commander ? `<b style="color:#F0C94A">${escapeHtml(commander.name)}</b>` : `<span style="color:#5B6779">— دوس ⭐ جنب اسم فرد بالأسفل لتعيينه —</span>`}
         </div>
         <div style="font-size:11px;color:#5B6779;margin-bottom:6px">${squadMembers.length} فرد</div>
         ${squadMembers.map(m => `
           <div class="smallMember">
-            <span>${escapeHtml(m.name)}${m.id===s.commander_member_id?" ⭐":""}</span>
+            <span>${escapeHtml(m.name)}${m.id===s.commander_member_id?" 🎖️":""}</span>
             <span style="display:flex;align-items:center;gap:6px">
+              <button class="xbtn" title="${m.id===s.commander_member_id?'إلغاء تعيينه قائدًا':'تعيين قائد المجموعة'}" data-togglesquadcmd="${s.id}" data-memberforcmd="${m.id}" style="color:${m.id===s.commander_member_id?'#F0C94A':'#5B6779'}">⭐</button>
               <span class="pinTag" data-showpin="${m.id}" data-pin="${m.pin}">••••</span>
               <button class="xbtn" title="إخراج من المجموعة" data-unassignsquad="${m.id}">↩️</button>
               <button class="xbtn" data-removemember="${m.id}">🗑️</button>
@@ -386,12 +386,28 @@
       await sb.from("squads").delete().eq("id", b.getAttribute("data-delsquad"));
       await rerenderRosterKeepScroll();
     }));
-    main.querySelectorAll("[data-platooncmd]").forEach(sel => sel.addEventListener("change", async () => {
-      await sb.from("platoons").update({ commander_member_id: sel.value || null }).eq("id", sel.getAttribute("data-platooncmd"));
+    main.querySelectorAll("[data-setplatooncmdnew]").forEach(b => b.addEventListener("click", async () => {
+      const platoonId = b.getAttribute("data-setplatooncmdnew");
+      const unitId = b.getAttribute("data-unitforplatooncmd");
+      const input = main.querySelector(`[data-newplatooncmdname="${platoonId}"]`);
+      const name = input.value.trim(); if (!name) return;
+      const { data: newMember } = await sb.from("members").insert({ unit_id: unitId, name, pin: genPin() }).select().single();
+      await sb.from("platoons").update({ commander_member_id: newMember.id }).eq("id", platoonId);
       await rerenderRosterKeepScroll();
     }));
-    main.querySelectorAll("[data-squadcmd]").forEach(sel => sel.addEventListener("change", async () => {
-      await sb.from("squads").update({ commander_member_id: sel.value || null }).eq("id", sel.getAttribute("data-squadcmd"));
+    main.querySelectorAll("[data-newplatooncmdname]").forEach(i => i.addEventListener("keydown", e => {
+      if (e.key === "Enter") main.querySelector(`[data-setplatooncmdnew="${i.getAttribute("data-newplatooncmdname")}"]`).click();
+    }));
+    main.querySelectorAll("[data-removeplatooncmd]").forEach(b => b.addEventListener("click", async () => {
+      await sb.from("platoons").update({ commander_member_id: null }).eq("id", b.getAttribute("data-removeplatooncmd"));
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-togglesquadcmd]").forEach(b => b.addEventListener("click", async () => {
+      const squadId = b.getAttribute("data-togglesquadcmd");
+      const memberId = b.getAttribute("data-memberforcmd");
+      const squad = SQUADS.find(s => s.id === squadId);
+      const nextVal = squad.commander_member_id === memberId ? null : memberId;
+      await sb.from("squads").update({ commander_member_id: nextVal }).eq("id", squadId);
       await rerenderRosterKeepScroll();
     }));
     main.querySelectorAll("[data-assignsquad]").forEach(sel => sel.addEventListener("change", async () => {
