@@ -66,6 +66,17 @@
   .badge { font-size:12px; border-radius:20px; padding:3px 10px; border:1px solid; }
   .approveBtn { background:#0F2A1B; border:1px solid #2FAE60; color:#2FAE60; border-radius:6px; padding:6px 10px; font-size:12px; font-weight:700; }
   .rejectBtn { background:#2A1414; border:1px solid #D64545; color:#D64545; border-radius:6px; padding:6px 10px; font-size:12px; font-weight:700; }
+  .platoonCard { background:#101A28; border:1px solid #24334A; border-radius:12px; padding:12px; margin-top:12px; }
+  .platoonHead { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+  .platoonHead input.unitTitle { font-size:15px; border-bottom:2px solid #24334A; }
+  .cmdRow { display:flex; align-items:center; gap:6px; font-size:12px; color:#8A97A8; margin-bottom:10px; }
+  .cmdRow select { margin:0; padding:5px 6px; font-size:12px; flex:1; }
+  .squadCard { background:#0F1720; border:1px solid #1E2B41; border-radius:10px; padding:10px; margin-top:8px; }
+  .squadHead { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
+  .squadHead input.unitTitle { font-size:13.5px; border-bottom:2px solid #1E2B41; }
+  .smallMember { display:flex; justify-content:space-between; align-items:center; background:#141F2E; border-radius:8px; padding:6px 8px; margin-bottom:5px; font-size:12.5px; }
+  .unassignedBox { border:1px dashed #3A4658; border-radius:10px; padding:10px; margin-top:12px; }
+  .smallBtn { background:#1E2B41; border:1px dashed #3A4658; color:#C7D0DC; border-radius:6px; padding:4px 8px; font-size:11px; cursor:pointer; margin:2px; }
 </style>
 </head>
 <body>
@@ -101,7 +112,7 @@
   };
   const REQUEST_TYPES = ["sick","travel","leave","excuse"];
 
-  let UNITS = [], MEMBERS = [], ROTATION = null;
+  let UNITS = [], MEMBERS = [], ROTATION = null, PLATOONS = [], SQUADS = [];
   let currentTab = "roster";
   let currentDate = todayISO();
 
@@ -146,6 +157,19 @@
     await sb.from("settings").insert({ key:"rotation", value });
     return value;
   }
+  async function loadPlatoons() {
+    const { data } = await sb.from("platoons").select("*").order("name");
+    return data || [];
+  }
+  async function loadSquads() {
+    const { data } = await sb.from("squads").select("*").order("name");
+    return data || [];
+  }
+  async function refreshHierarchy() {
+    MEMBERS = await loadMembers(UNITS.map(u => u.id));
+    PLATOONS = await loadPlatoons();
+    SQUADS = await loadSquads();
+  }
   function getOnDutyUnitId(units, rotation, dateISO) {
     const anchor = new Date(rotation.date+"T00:00:00");
     const target = new Date(dateISO+"T00:00:00");
@@ -183,6 +207,8 @@
     UNITS = await ensureDefaultUnits();
     MEMBERS = await loadMembers(UNITS.map(u => u.id));
     ROTATION = await getRotation(UNITS);
+    PLATOONS = await loadPlatoons();
+    SQUADS = await loadSquads();
 
     render();
   }
@@ -195,40 +221,125 @@
   }
 
   // ---------- Roster ----------
-  async function refreshRosterData() {
-    UNITS = await ensureDefaultUnits();
-    MEMBERS = await loadMembers(UNITS.map(u => u.id));
-  }
+  async function refreshRosterData() { await refreshHierarchy(); }
 
   function renderRoster() {
     const main = document.getElementById("main");
     main.innerHTML = `
-      <div class="rosterGrid">
-        ${UNITS.map(u => `
-          <div class="unitCard">
-            <input class="unitTitle" data-rename="${u.id}" value="${escapeHtml(u.name)}" />
-            <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">${MEMBERS.filter(m=>m.unit_id===u.id).length} فرد</div>
-            <div>
-              ${MEMBERS.filter(m=>m.unit_id===u.id).map(m => `
-                <div class="memberRow"><div class="memberRowTop">
-                  <span>${escapeHtml(m.name)}</span>
-                  <span>
-                    <span class="pinTag" data-showpin="${m.id}" data-pin="${m.pin}">••••</span>
-                    <button class="xbtn" data-removemember="${m.id}">🗑️</button>
-                  </span>
-                </div></div>
-              `).join("") || `<div class="empty">لا يوجد أفراد بعد</div>`}
-            </div>
-            <div class="addRow">
-              <input type="text" placeholder="اسم الفرد الجديد" data-newname="${u.id}" />
-              <button data-addmember="${u.id}">إضافة</button>
-            </div>
-          </div>
-        `).join("")}
+      <div class="rosterGrid" style="grid-template-columns:1fr">
+        ${UNITS.map(u => renderUnitBlock(u)).join("")}
       </div>
     `;
+    wireRosterEvents(main);
+  }
+
+  function renderUnitBlock(u) {
+    const unitPlatoons = PLATOONS.filter(p => p.unit_id === u.id);
+    const unitMemberIds = new Set(MEMBERS.filter(m => m.unit_id === u.id).map(m => m.id));
+    const unassigned = MEMBERS.filter(m => m.unit_id === u.id && !m.squad_id);
+    return `
+      <div class="unitCard">
+        <input class="unitTitle" data-rename="${u.id}" value="${escapeHtml(u.name)}" />
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:6px">${MEMBERS.filter(m=>m.unit_id===u.id).length} فرد — ${unitPlatoons.length} فصيلة</div>
+
+        ${unitPlatoons.map(p => renderPlatoonBlock(p, u)).join("")}
+
+        <button class="smallBtn" data-addplatoon="${u.id}" style="margin-top:10px">+ إضافة فصيلة</button>
+
+        <div class="unassignedBox">
+          <div style="font-size:12px;color:#8A97A8;margin-bottom:8px">أفراد غير مصنّفين بفصيلة/مجموعة بعد</div>
+          ${unassigned.length === 0 ? `<div style="color:#5B6779;font-size:12px">لا يوجد</div>` : unassigned.map(m => `
+            <div class="smallMember">
+              <span>${escapeHtml(m.name)}</span>
+              <span style="display:flex;align-items:center;gap:6px">
+                <select data-assignsquad="${m.id}" style="font-size:11px;padding:3px 4px;margin:0">
+                  <option value="">أرسل لمجموعة...</option>
+                  ${unitPlatoons.flatMap(p => SQUADS.filter(s=>s.platoon_id===p.id).map(s => `<option value="${s.id}">${escapeHtml(p.name)} / ${escapeHtml(s.name)}</option>`)).join("")}
+                </select>
+                <span class="pinTag" data-showpin="${m.id}" data-pin="${m.pin}">••••</span>
+                <button class="xbtn" data-removemember="${m.id}">🗑️</button>
+              </span>
+            </div>
+          `).join("")}
+          <div class="addRow">
+            <input type="text" placeholder="اسم فرد جديد (غير مصنّف)" data-newname="${u.id}" />
+            <button data-addmember="${u.id}">إضافة</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPlatoonBlock(p, unit) {
+    const unitMembers = MEMBERS.filter(m => m.unit_id === unit.id);
+    const squads = SQUADS.filter(s => s.platoon_id === p.id);
+    const commander = MEMBERS.find(m => m.id === p.commander_member_id);
+    return `
+      <div class="platoonCard">
+        <div class="platoonHead">
+          <input class="unitTitle" data-renameplatoon="${p.id}" value="${escapeHtml(p.name)}" />
+          <button class="xbtn" data-delplatoon="${p.id}">🗑️</button>
+        </div>
+        <div class="cmdRow">
+          👤 قائد الفصيلة:
+          <select data-platooncmd="${p.id}">
+            <option value="">— بدون —</option>
+            ${unitMembers.map(m => `<option value="${m.id}" ${m.id===p.commander_member_id?"selected":""}>${escapeHtml(m.name)}</option>`).join("")}
+          </select>
+        </div>
+        ${squads.map(s => renderSquadBlock(s, p, unit)).join("")}
+        <button class="smallBtn" data-addsquad="${p.id}">+ إضافة مجموعة</button>
+      </div>
+    `;
+  }
+
+  function renderSquadBlock(s, platoon, unit) {
+    const squadMembers = MEMBERS.filter(m => m.squad_id === s.id);
+    const unitMembers = MEMBERS.filter(m => m.unit_id === unit.id);
+    return `
+      <div class="squadCard">
+        <div class="squadHead">
+          <input class="unitTitle" data-renamesquad="${s.id}" value="${escapeHtml(s.name)}" />
+          <button class="xbtn" data-delsquad="${s.id}">🗑️</button>
+        </div>
+        <div class="cmdRow">
+          👤 قائد المجموعة:
+          <select data-squadcmd="${s.id}">
+            <option value="">— بدون —</option>
+            ${unitMembers.map(m => `<option value="${m.id}" ${m.id===s.commander_member_id?"selected":""}>${escapeHtml(m.name)}</option>`).join("")}
+          </select>
+        </div>
+        <div style="font-size:11px;color:#5B6779;margin-bottom:6px">${squadMembers.length} فرد</div>
+        ${squadMembers.map(m => `
+          <div class="smallMember">
+            <span>${escapeHtml(m.name)}${m.id===s.commander_member_id?" ⭐":""}</span>
+            <span style="display:flex;align-items:center;gap:6px">
+              <span class="pinTag" data-showpin="${m.id}" data-pin="${m.pin}">••••</span>
+              <button class="xbtn" title="إخراج من المجموعة" data-unassignsquad="${m.id}">↩️</button>
+              <button class="xbtn" data-removemember="${m.id}">🗑️</button>
+            </span>
+          </div>
+        `).join("")}
+        <div class="addRow">
+          <input type="text" placeholder="اسم فرد جديد بهاي المجموعة" data-newnamesquad="${s.id}" data-unitforsquad="${unit.id}" />
+          <button data-addmembersquad="${s.id}" data-unitforsquad2="${unit.id}">إضافة</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function wireRosterEvents(main) {
     main.querySelectorAll("[data-rename]").forEach(i => i.addEventListener("change", async () => {
       await sb.from("units").update({ name:i.value.trim() }).eq("id", i.getAttribute("data-rename"));
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-renameplatoon]").forEach(i => i.addEventListener("change", async () => {
+      await sb.from("platoons").update({ name:i.value.trim() }).eq("id", i.getAttribute("data-renameplatoon"));
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-renamesquad]").forEach(i => i.addEventListener("change", async () => {
+      await sb.from("squads").update({ name:i.value.trim() }).eq("id", i.getAttribute("data-renamesquad"));
+      await refreshRosterData(); renderRoster();
     }));
     main.querySelectorAll("[data-showpin]").forEach(s => s.addEventListener("click", () => {
       s.textContent = s.textContent === "••••" ? s.getAttribute("data-pin") : "••••";
@@ -241,14 +352,64 @@
       const unitId = b.getAttribute("data-addmember");
       const input = main.querySelector(`[data-newname="${unitId}"]`);
       const name = input.value.trim(); if (!name) return;
-      b.disabled = true;
       await sb.from("members").insert({ unit_id:unitId, name, pin:genPin() });
       await refreshRosterData(); renderRoster();
     }));
     main.querySelectorAll("[data-newname]").forEach(i => i.addEventListener("keydown", e => {
       if (e.key === "Enter") main.querySelector(`[data-addmember="${i.getAttribute("data-newname")}"]`).click();
     }));
+    main.querySelectorAll("[data-addplatoon]").forEach(b => b.addEventListener("click", async () => {
+      const name = prompt("اسم الفصيلة الجديدة:", "الفصيلة");
+      if (!name) return;
+      await sb.from("platoons").insert({ unit_id: b.getAttribute("data-addplatoon"), name: name.trim() });
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-delplatoon]").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm("حذف الفصيلة وكل مجموعاتها؟ الأفراد رح يرجعوا غير مصنّفين.")) return;
+      await sb.from("platoons").delete().eq("id", b.getAttribute("data-delplatoon"));
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-addsquad]").forEach(b => b.addEventListener("click", async () => {
+      const name = prompt("اسم المجموعة الجديدة:", "المجموعة");
+      if (!name) return;
+      await sb.from("squads").insert({ platoon_id: b.getAttribute("data-addsquad"), name: name.trim() });
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-delsquad]").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm("حذف المجموعة؟ الأفراد رح يرجعوا غير مصنّفين.")) return;
+      await sb.from("squads").delete().eq("id", b.getAttribute("data-delsquad"));
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-platooncmd]").forEach(sel => sel.addEventListener("change", async () => {
+      await sb.from("platoons").update({ commander_member_id: sel.value || null }).eq("id", sel.getAttribute("data-platooncmd"));
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-squadcmd]").forEach(sel => sel.addEventListener("change", async () => {
+      await sb.from("squads").update({ commander_member_id: sel.value || null }).eq("id", sel.getAttribute("data-squadcmd"));
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-assignsquad]").forEach(sel => sel.addEventListener("change", async () => {
+      if (!sel.value) return;
+      await sb.from("members").update({ squad_id: sel.value }).eq("id", sel.getAttribute("data-assignsquad"));
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-unassignsquad]").forEach(b => b.addEventListener("click", async () => {
+      await sb.from("members").update({ squad_id: null }).eq("id", b.getAttribute("data-unassignsquad"));
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-addmembersquad]").forEach(b => b.addEventListener("click", async () => {
+      const squadId = b.getAttribute("data-addmembersquad");
+      const unitId = b.getAttribute("data-unitforsquad2");
+      const input = main.querySelector(`[data-newnamesquad="${squadId}"]`);
+      const name = input.value.trim(); if (!name) return;
+      await sb.from("members").insert({ unit_id:unitId, squad_id:squadId, name, pin:genPin() });
+      await refreshRosterData(); renderRoster();
+    }));
+    main.querySelectorAll("[data-newnamesquad]").forEach(i => i.addEventListener("keydown", e => {
+      if (e.key === "Enter") main.querySelector(`[data-addmembersquad="${i.getAttribute("data-newnamesquad")}"]`).click();
+    }));
   }
+
 
   // ---------- Duty ----------
   async function loadAttendance(dateISO) {
