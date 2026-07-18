@@ -77,6 +77,11 @@
   .smallMember { display:flex; justify-content:space-between; align-items:center; background:#141F2E; border-radius:8px; padding:6px 8px; margin-bottom:5px; font-size:12.5px; }
   .unassignedBox { border:1px dashed #3A4658; border-radius:10px; padding:10px; margin-top:12px; }
   .smallBtn { background:#1E2B41; border:1px dashed #3A4658; color:#C7D0DC; border-radius:6px; padding:4px 8px; font-size:11px; cursor:pointer; margin:2px; }
+  .planBox { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:14px; margin-bottom:14px; }
+  .planRow { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px dashed #1E2B41; }
+  .planRow:last-child { border-bottom:none; }
+  .planRow select { margin:0; padding:6px 8px; font-size:12.5px; width:auto; min-width:130px; }
+  .leftoverBox { border:1px dashed #3A4658; border-radius:10px; padding:10px; margin-top:12px; }
 </style>
 </head>
 <body>
@@ -178,6 +183,23 @@
     const other = units.find(u => u.id !== rotation.onDutyUnit)?.id || rotation.onDutyUnit;
     const parity = ((weekIndex % 2) + 2) % 2;
     return parity === 0 ? rotation.onDutyUnit : other;
+  }
+  function getWeekStart(dateISO, rotation) {
+    const anchor = new Date(rotation.date+"T00:00:00");
+    const target = new Date(dateISO+"T00:00:00");
+    const diffDays = Math.round((target - anchor) / 86400000);
+    const weekIndex = Math.floor(diffDays / 7);
+    const start = new Date(anchor.getTime() + weekIndex * 7 * 86400000);
+    return `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`;
+  }
+  async function loadShiftPlan(weekStart) {
+    const { data } = await sb.from("platoon_shift_plan").select("*").eq("week_start", weekStart);
+    return data || [];
+  }
+  async function setPlatoonShift(platoonId, weekStart, shift) {
+    const { data: existing } = await sb.from("platoon_shift_plan").select("*").eq("platoon_id", platoonId).eq("week_start", weekStart).maybeSingle();
+    if (existing) await sb.from("platoon_shift_plan").update({ shift: shift || null }).eq("id", existing.id);
+    else await sb.from("platoon_shift_plan").insert({ platoon_id: platoonId, week_start: weekStart, shift: shift || null });
   }
 
   async function bootApp() {
@@ -454,11 +476,30 @@
     const onDutyUnitId = getOnDutyUnitId(UNITS, ROTATION, currentDate);
     const onDutyUnit = UNITS.find(u => u.id === onDutyUnitId) || UNITS[0];
     const offDutyUnit = UNITS.find(u => u.id !== onDutyUnitId) || UNITS[1];
-    const members = MEMBERS.filter(m => m.unit_id === onDutyUnitId);
+    const weekStart = getWeekStart(currentDate, ROTATION);
+    const planRows = await loadShiftPlan(weekStart);
+    const onDutyPlatoons = PLATOONS.filter(p => p.unit_id === onDutyUnitId);
     const recByMember = {};
     records.forEach(r => recByMember[r.member_id] = r);
     const now = new Date();
     const isToday = currentDate === todayISO();
+
+    function membersOfPlatoon(platoonId) {
+      const squadIds = SQUADS.filter(s => s.platoon_id === platoonId).map(s => s.id);
+      return MEMBERS.filter(m => squadIds.includes(m.squad_id));
+    }
+
+    const coveredMemberIds = new Set();
+    const shiftMembersMap = {};
+    SHIFTS.forEach(shift => {
+      const platoonIds = planRows.filter(r => r.shift === shift.id && onDutyPlatoons.some(p => p.id === r.platoon_id)).map(r => r.platoon_id);
+      const mems = platoonIds.flatMap(pid => membersOfPlatoon(pid));
+      shiftMembersMap[shift.id] = mems;
+      mems.forEach(m => coveredMemberIds.add(m.id));
+    });
+
+    const allUnitMembers = MEMBERS.filter(m => m.unit_id === onDutyUnitId);
+    const leftover = allUnitMembers.filter(m => !coveredMemberIds.has(m.id));
 
     main.innerHTML = `
       <div class="dateBar">
@@ -473,26 +514,46 @@
         <div><div class="dutyLabel">السرية المناوبة هذا الأسبوع</div><div class="dutyUnit">${escapeHtml(onDutyUnit?.name||"")}</div></div>
         <div style="text-align:left"><div style="font-size:12px;color:#8A97A8">مستريحة</div><div style="font-size:13px;color:#8A97A8">${escapeHtml(offDutyUnit?.name||"")}</div></div>
       </div>
-      ${members.length === 0 ? `<div class="empty">لا يوجد أفراد بـ${escapeHtml(onDutyUnit?.name||"")} بعد — أضفهم من تبويب «الطاقم».</div>` : ""}
-      <div class="shiftGrid">
-        ${SHIFTS.map(shift => {
-          const shiftMembers = members.filter(m => recByMember[m.id]?.shift === shift.id);
-          const unassigned = members.filter(m => !recByMember[m.id]?.shift);
+
+      <div class="planBox">
+        <div style="font-weight:800;margin-bottom:8px">🗓️ خطة نوبات الأسبوع (من ${monthNameAr(weekStart)})</div>
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">حدد أي فصيلة تاخد أي نوبة — بينطبق تلقائيًا على كل أيام هالأسبوع لهاي السرية.</div>
+        ${onDutyPlatoons.length === 0 ? `<div class="empty">ما عندك فصائل بـ${escapeHtml(onDutyUnit?.name||"")} بعد — أضفها من تبويب «الطاقم».</div>` : onDutyPlatoons.map(p => {
+          const current = planRows.find(r => r.platoon_id === p.id)?.shift || "";
           return `
-            <div class="shiftCard">
-              <div class="shiftHeader" style="color:${shift.color}"><span>${shift.label}</span><span style="font-size:12px;color:#8A97A8">${shift.range}</span></div>
-              ${shiftMembers.length===0 ? `<div style="color:#5B6779;font-size:12px;padding:6px 0">لا يوجد أفراد مسندون</div>` : ""}
-              ${shiftMembers.map(m => renderMemberRow(m, recByMember[m.id], shift, now, isToday)).join("")}
-              ${unassigned.length>0 ? `
-                <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #2A3547">
-                  <div style="font-size:12px;color:#8A97A8;margin-bottom:6px">إسناد فرد لهذه النوبة:</div>
-                  ${unassigned.map(m => `<button class="assignChip" data-assign="${m.id}" data-shift="${shift.id}">+ ${escapeHtml(m.name)}</button>`).join("")}
-                </div>
-              ` : ""}
+            <div class="planRow">
+              <span>${escapeHtml(p.name)}</span>
+              <select data-planshift="${p.id}">
+                <option value="">— بدون نوبة (راحة) —</option>
+                ${SHIFTS.map(s => `<option value="${s.id}" ${current===s.id?"selected":""}>${s.label} (${s.range})</option>`).join("")}
+              </select>
             </div>
           `;
         }).join("")}
       </div>
+
+      ${allUnitMembers.length === 0 ? `<div class="empty">لا يوجد أفراد بـ${escapeHtml(onDutyUnit?.name||"")} بعد — أضفهم من تبويب «الطاقم».</div>` : ""}
+      <div class="shiftGrid">
+        ${SHIFTS.map(shift => {
+          const shiftMembers = shiftMembersMap[shift.id];
+          const platoonNames = planRows.filter(r => r.shift===shift.id && onDutyPlatoons.some(p=>p.id===r.platoon_id)).map(r => onDutyPlatoons.find(p=>p.id===r.platoon_id)?.name).filter(Boolean);
+          return `
+            <div class="shiftCard">
+              <div class="shiftHeader" style="color:${shift.color}"><span>${shift.label}</span><span style="font-size:12px;color:#8A97A8">${shift.range}</span></div>
+              ${platoonNames.length>0 ? `<div style="font-size:11px;color:#8A97A8;margin-bottom:8px">الفصيلة: ${platoonNames.map(escapeHtml).join("، ")}</div>` : `<div style="font-size:11px;color:#5B6779;margin-bottom:8px">ما في فصيلة معيّنة لهاي النوبة هالأسبوع</div>`}
+              ${shiftMembers.length===0 ? `<div style="color:#5B6779;font-size:12px;padding:6px 0">لا يوجد أفراد</div>` : ""}
+              ${shiftMembers.map(m => renderMemberRow(m, recByMember[m.id], shift, now, isToday)).join("")}
+            </div>
+          `;
+        }).join("")}
+      </div>
+
+      ${leftover.length>0 ? `
+        <div class="leftoverBox">
+          <div style="font-size:12px;color:#8A97A8;margin-bottom:8px">⚠️ أفراد من ${escapeHtml(onDutyUnit?.name||"")} مش مغطّين بأي نوبة هالأسبوع (إما مش بفصيلة/مجموعة، أو فصيلتهم ما إلها نوبة معيّنة):</div>
+          ${leftover.map(m => `<span style="display:inline-block;background:#141F2E;border:1px solid #2A3547;border-radius:8px;padding:4px 8px;margin:3px;font-size:12px">${escapeHtml(m.name)}</span>`).join("")}
+        </div>
+      ` : ""}
     `;
 
     document.querySelector("[data-prevday]").onclick = () => { currentDate = addDays(currentDate, -1); renderDuty(); };
@@ -500,16 +561,11 @@
     const todayBtn = document.querySelector("[data-today]");
     if (todayBtn) todayBtn.onclick = () => { currentDate = todayISO(); renderDuty(); };
 
-    main.querySelectorAll("[data-assign]").forEach(btn => btn.addEventListener("click", async () => {
-      const memberId = btn.getAttribute("data-assign");
-      const shift = btn.getAttribute("data-shift");
-      await upsertAttendance(memberId, currentDate, { shift });
+    main.querySelectorAll("[data-planshift]").forEach(sel => sel.addEventListener("change", async () => {
+      await setPlatoonShift(sel.getAttribute("data-planshift"), weekStart, sel.value);
       renderDuty();
     }));
-    main.querySelectorAll("[data-unassign]").forEach(btn => btn.addEventListener("click", async () => {
-      await upsertAttendance(btn.getAttribute("data-unassign"), currentDate, { shift: null });
-      renderDuty();
-    }));
+
     main.querySelectorAll("[data-status]").forEach(btn => btn.addEventListener("click", async () => {
       const memberId = btn.getAttribute("data-memberid");
       const status = btn.getAttribute("data-status");
@@ -554,7 +610,6 @@
       <div class="memberRow" id="row-${member.id}">
         <div class="memberRowTop">
           <span>${escapeHtml(member.name)}</span>
-          <button class="xbtn" data-unassign="${member.id}">🗑️</button>
         </div>
         <div class="pillsRow">
           <button class="pill ${status==='present'?'active':''}" data-status="present" data-memberid="${member.id}" style="border-color:${STATUS.present.color};color:${status==='present'?'#0F1720':STATUS.present.color};${status==='present'?`background:${STATUS.present.color}`:''}">حاضر</button>
@@ -616,7 +671,8 @@
     });
   }
 
-  // ---------- Requests ----------
+  
+// ---------- Requests ----------
   async function loadRequests() {
     const { data } = await sb.from("requests").select("*").order("created_at", { ascending:false });
     return data || [];
