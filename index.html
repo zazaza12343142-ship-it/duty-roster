@@ -124,6 +124,7 @@
   let currentTab = "dashboard";
   let currentDate = todayISO();
   const inviteToken = new URLSearchParams(location.search).get("invite");
+  const checkinMode = new URLSearchParams(location.search).get("checkin");
 
   function renderLogin(errMsg) {
     app.innerHTML = `
@@ -288,6 +289,15 @@
     const pendingInvites = await loadPendingInvites();
     main.innerHTML = `
       <div class="formCard">
+        <div style="font-weight:800;margin-bottom:8px">🪪 رابط تسجيل الحضور اليومي (ثابت، للجميع)</div>
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">ابعت هالرابط مرة وحدة لكل الأفراد (بمجموعة أو جدار إعلانات) — كل واحد بيدخل باسمه ورمزه الخاص فيه.</div>
+        <div class="verifyBox">
+          <input type="text" readonly value="${escapeHtml(location.origin + location.pathname)}?checkin=1" style="flex:1;font-size:11px" onclick="this.select()" />
+          <button class="miniBtn" id="copyCheckinLinkBtn">نسخ</button>
+        </div>
+      </div>
+
+      <div class="formCard">
         <div style="font-weight:800;margin-bottom:8px">🔗 دعوة فرد جديد للتسجيل الذاتي</div>
         <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">كل رابط يشتغل مرة وحدة بس — ابعته لشخص واحد محدد فقط.</div>
         <button id="genInviteBtn">توليد رابط دعوة جديد</button>
@@ -316,6 +326,11 @@
   }
 
   function wireInviteEvents(main) {
+    const copyCheckinBtn = document.getElementById("copyCheckinLinkBtn");
+    if (copyCheckinBtn) copyCheckinBtn.onclick = () => {
+      navigator.clipboard.writeText(`${location.origin}${location.pathname}?checkin=1`);
+      copyCheckinBtn.textContent = "✔ انتسخ";
+    };
     const genBtn = document.getElementById("genInviteBtn");
     if (genBtn) genBtn.onclick = async () => {
       genBtn.disabled = true; genBtn.textContent = "...";
@@ -1153,8 +1168,108 @@
     `;
   }
 
+  // ---------- Public daily self check-in (name + PIN, fixed link) ----------
+  function renderCheckinLogin(prefill) {
+    app.innerHTML = `
+      <div class="center"><div class="card" style="max-width:400px;text-align:right">
+        <h1 style="text-align:center">🪪 تسجيل حضور</h1>
+        <p style="text-align:center">اكتب اسمك ورمزك الشخصي</p>
+        <input type="text" id="ciName" placeholder="اسمك الكامل" value="${escapeHtml(prefill?.name||"")}" />
+        <input type="text" id="ciPin" placeholder="الرمز الشخصي (٤ أرقام)" inputmode="numeric" maxlength="4" />
+        <button id="ciSubmit" style="width:100%">دخول</button>
+        <div id="ciErr" class="err"></div>
+      </div></div>
+    `;
+    document.getElementById("ciSubmit").onclick = async () => {
+      const name = document.getElementById("ciName").value.trim();
+      const pin = document.getElementById("ciPin").value.trim();
+      const errEl = document.getElementById("ciErr");
+      if (!name || !pin) { errEl.textContent = "عبّي اسمك ورمزك"; return; }
+      errEl.textContent = "";
+      const btn = document.getElementById("ciSubmit");
+      btn.disabled = true; btn.textContent = "...";
+      const { data, error } = await sb.rpc("member_login", { p_name: name, p_pin: pin });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (error || !row) {
+        btn.disabled = false; btn.textContent = "دخول";
+        errEl.textContent = "الاسم أو الرمز غير صحيح، جرب مرة ثانية.";
+        return;
+      }
+      renderCheckinInfo(row, pin);
+    };
+  }
+
+  function renderCheckinInfo(row, pin) {
+    let shiftText;
+    if (!row.on_duty) shiftText = "فصيلتك مستريحة هالأسبوع (سريتك مو مناوبة)";
+    else if (!row.shift) shiftText = "الفصيلة مناوبة، بس لسا ما تحدد إلها نوبة معيّنة";
+    else { const s = SHIFTS.find(x => x.id === row.shift); shiftText = `${s ? s.label : row.shift} (${s ? s.range : ""})`; }
+
+    let statusBox;
+    if (row.today_status === "present") {
+      const rangeHtml = typeof row.today_in_range === "boolean"
+        ? (row.today_in_range
+            ? `<div style="font-size:12px;color:#2FAE60;margin-top:4px">✔ داخل نطاق القاعدة</div>`
+            : `<div style="font-size:12px;color:#D64545;margin-top:4px">⚠️ خارج نطاق القاعدة (~${row.today_distance_m} م)</div>`)
+        : "";
+      statusBox = `
+        <div class="formCard" style="text-align:center">
+          <div style="font-weight:800;color:#2FAE60">✅ أكدت حضورك اليوم الساعة ${escapeHtml(row.today_time_in||"")}</div>
+          ${rangeHtml}
+        </div>`;
+    } else if (row.today_status && REQUEST_TYPES.includes(row.today_status)) {
+      statusBox = `<div class="formCard" style="text-align:center"><div style="font-weight:800;color:${STATUS[row.today_status].color}">📋 عندك ${STATUS[row.today_status].label} مسجّلة اليوم</div></div>`;
+    } else {
+      statusBox = `<button id="ciConfirmBtn" style="width:100%">📍 تأكيد الحضور الآن</button>`;
+    }
+
+    app.innerHTML = `
+      <div class="center"><div class="card" style="max-width:400px;text-align:right">
+        <h1 style="text-align:center">👋 أهلًا ${escapeHtml(row.member_name)}</h1>
+        <div class="formCard">
+          <div style="font-size:13px;line-height:2">
+            <div>🏢 السرية: <b>${escapeHtml(row.unit_name||"—")}</b></div>
+            <div>🚩 الفصيلة: <b>${escapeHtml(row.platoon_name||"—")}</b>${row.platoon_commander ? ` — قائدها: ${escapeHtml(row.platoon_commander)}` : ""}</div>
+            <div>👥 المجموعة: <b>${escapeHtml(row.squad_name||"—")}</b>${row.squad_commander ? ` — قائدها: ${escapeHtml(row.squad_commander)}` : ""}</div>
+            <div>⏰ نوبتك: <b>${shiftText}</b></div>
+          </div>
+        </div>
+        ${statusBox}
+        <div id="ciConfirmErr" class="err"></div>
+        <button class="linkbtn" id="ciBackBtn" style="width:100%;margin-top:10px">🔄 مو أنا — رجعني لصفحة الدخول</button>
+      </div></div>
+    `;
+
+    const confirmBtn = document.getElementById("ciConfirmBtn");
+    if (confirmBtn) confirmBtn.onclick = async () => {
+      confirmBtn.disabled = true; confirmBtn.textContent = "...جارِ تحديد الموقع";
+      const geo = await getGeo();
+      if (!geo) {
+        confirmBtn.disabled = false; confirmBtn.textContent = "📍 تأكيد الحضور الآن";
+        document.getElementById("ciConfirmErr").textContent = "لازم تسمح بالوصول للموقع لتأكيد الحضور.";
+        return;
+      }
+      const { data: resultGeo, error } = await sb.rpc("member_checkin", {
+        p_member_id: row.member_id, p_pin: pin, p_lat: geo.lat, p_lng: geo.lng, p_accuracy: geo.accuracy
+      });
+      if (error) {
+        confirmBtn.disabled = false; confirmBtn.textContent = "📍 تأكيد الحضور الآن";
+        document.getElementById("ciConfirmErr").textContent = "صار خطأ، جرب مرة ثانية.";
+        return;
+      }
+      row.today_status = "present";
+      row.today_time_in = new Date().toTimeString().slice(0,5);
+      row.today_in_range = resultGeo?.in_range;
+      row.today_distance_m = resultGeo?.distance_m;
+      renderCheckinInfo(row, pin);
+    };
+
+    document.getElementById("ciBackBtn").onclick = () => renderCheckinLogin({ name: row.member_name });
+  }
+
   (async () => {
     if (inviteToken) { await renderInviteFlow(inviteToken); return; }
+    if (checkinMode) { renderCheckinLogin(); return; }
     const { data: { session } } = await sb.auth.getSession();
     if (session) await bootApp();
     else renderLogin();
