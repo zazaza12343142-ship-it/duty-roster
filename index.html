@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   * { box-sizing: border-box; font-family: 'Tahoma', sans-serif; }
   body { margin:0; min-height:100vh; background:#0F1720; color:#E7ECF2; }
@@ -289,6 +290,12 @@
     const pendingInvites = await loadPendingInvites();
     main.innerHTML = `
       <div class="formCard">
+        <div style="font-weight:800;margin-bottom:8px">🔍 بحث سريع عن فرد</div>
+        <input type="text" id="rosterSearchInput" placeholder="اكتب اسم الفرد..." />
+        <div id="rosterSearchResults"></div>
+      </div>
+
+      <div class="formCard">
         <div style="font-weight:800;margin-bottom:8px">🪪 رابط تسجيل الحضور اليومي (ثابت، للجميع)</div>
         <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">ابعت هالرابط مرة وحدة لكل الأفراد (بمجموعة أو جدار إعلانات) — كل واحد بيدخل باسمه ورمزه الخاص فيه.</div>
         <div class="verifyBox">
@@ -326,6 +333,30 @@
   }
 
   function wireInviteEvents(main) {
+    const searchInput = document.getElementById("rosterSearchInput");
+    const resultsBox = document.getElementById("rosterSearchResults");
+    if (searchInput) searchInput.oninput = () => {
+      const q = searchInput.value.trim();
+      if (!q) { resultsBox.innerHTML = ""; return; }
+      const matches = MEMBERS.filter(m => m.name.includes(q));
+      if (matches.length === 0) {
+        resultsBox.innerHTML = `<div style="font-size:12px;color:#8A97A8;margin-top:8px">ما في نتائج</div>`;
+        return;
+      }
+      resultsBox.innerHTML = `<div style="margin-top:8px">` + matches.slice(0, 20).map(m => {
+        const unit = UNITS.find(u => u.id === m.unit_id);
+        const squad = SQUADS.find(s => s.id === m.squad_id);
+        const platoon = squad ? PLATOONS.find(p => p.id === squad.platoon_id) : null;
+        const path = [unit?.name, platoon?.name, squad?.name].filter(Boolean).join(" / ") || "غير مصنّف";
+        return `
+          <div class="smallMember">
+            <span>${escapeHtml(m.name)}</span>
+            <span style="font-size:11px;color:#8A97A8">${escapeHtml(path)}</span>
+          </div>
+        `;
+      }).join("") + `</div>`;
+    };
+
     const copyCheckinBtn = document.getElementById("copyCheckinLinkBtn");
     if (copyCheckinBtn) copyCheckinBtn.onclick = () => {
       navigator.clipboard.writeText(`${location.origin}${location.pathname}?checkin=1`);
@@ -556,7 +587,46 @@
   }
 
 
-  // ---------- Dashboard ----------
+  const dayShortAr = (iso) => ["أحد","إثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت"][new Date(iso+"T00:00:00").getDay()];
+  function getSundayWeekStart(dateISO) {
+    const d = new Date(dateISO + "T00:00:00");
+    d.setDate(d.getDate() - d.getDay());
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+
+  async function exportWeeklyExcelReport(weekStartISO) {
+    const weekEndISO = addDays(weekStartISO, 6);
+    const records = await loadAttendanceRange(weekStartISO, weekEndISO);
+    const byDateMember = {};
+    records.forEach(r => { (byDateMember[r.date] ||= {})[r.member_id] = r.status; });
+
+    const days = Array.from({length:7}, (_, i) => addDays(weekStartISO, i));
+    const header = ["الاسم", "السرية", "الفصيلة", "المجموعة", ...days.map(d => `${dayShortAr(d)} ${d.slice(5)}`), "أيام الحضور", "أيام الغياب", "نسبة الحضور %"];
+
+    const rows = MEMBERS.map(m => {
+      const unit = UNITS.find(u => u.id === m.unit_id);
+      const squad = SQUADS.find(s => s.id === m.squad_id);
+      const platoon = squad ? PLATOONS.find(p => p.id === squad.platoon_id) : null;
+      let presentCount = 0, absentCount = 0;
+      const dayCells = days.map(d => {
+        const st = byDateMember[d]?.[m.id];
+        if (st === "present") { presentCount++; return "حاضر"; }
+        if (st === "absent") { absentCount++; return "غايب"; }
+        if (st && REQUEST_TYPES.includes(st)) return STATUS[st].label;
+        return "—";
+      });
+      const pct = Math.round((presentCount/7)*100);
+      return [m.name, unit?.name||"", platoon?.name||"", squad?.name||"", ...dayCells, presentCount, absentCount, pct];
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws["!cols"] = [{wch:20},{wch:12},{wch:14},{wch:14}, ...days.map(()=>({wch:10})), {wch:12},{wch:12},{wch:12}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "التقرير الأسبوعي");
+    XLSX.writeFile(wb, `تقرير-الحضور-${weekStartISO}.xlsx`);
+  }
+
+
   async function renderDashboard() {
     const main = document.getElementById("main");
     main.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
@@ -622,6 +692,13 @@
         </div>
       </div>
 
+      <div class="formCard">
+        <div style="font-weight:800;margin-bottom:8px">📥 التقرير الأسبوعي (Excel)</div>
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:8px">اختر أي يوم من الأسبوع المطلوب — التقرير بياخد الأسبوع كامل (من الأحد لحد السبت)</div>
+        <input type="date" id="reportWeekDate" value="${today}" style="margin-bottom:10px" />
+        <button id="exportWeekBtn" style="width:100%">تنزيل تقرير الأسبوع (Excel)</button>
+      </div>
+
       <div class="formCard" style="cursor:pointer" id="goRequestsCard">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
@@ -660,11 +737,24 @@
 
     const goReq = document.getElementById("goRequestsCard");
     if (goReq) goReq.onclick = () => { currentTab = "requests"; render(); };
+
+    const exportBtn = document.getElementById("exportWeekBtn");
+    if (exportBtn) exportBtn.onclick = async () => {
+      exportBtn.disabled = true; exportBtn.textContent = "...جارِ التجهيز";
+      const chosen = document.getElementById("reportWeekDate").value || today;
+      const weekStart = getSundayWeekStart(chosen);
+      await exportWeeklyExcelReport(weekStart);
+      exportBtn.disabled = false; exportBtn.textContent = "تنزيل تقرير الأسبوع (Excel)";
+    };
   }
 
   // ---------- Duty ----------
   async function loadAttendance(dateISO) {
     const { data } = await sb.from("attendance").select("*").eq("date", dateISO);
+    return data || [];
+  }
+  async function loadAttendanceRange(startISO, endISO) {
+    const { data } = await sb.from("attendance").select("*").gte("date", startISO).lte("date", endISO);
     return data || [];
   }
   async function upsertAttendance(memberId, dateISO, patch) {
