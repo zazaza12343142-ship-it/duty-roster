@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>سجلّ الدوام</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   * { box-sizing: border-box; font-family: 'Tahoma', sans-serif; }
   body { margin:0; min-height:100vh; background:#0F1720; color:#E7ECF2; }
@@ -118,8 +120,10 @@
   const REQUEST_TYPES = ["sick","travel","leave","excuse"];
 
   let UNITS = [], MEMBERS = [], ROTATION = null, PLATOONS = [], SQUADS = [];
+  let BASE_LOCATION = null;
   let currentTab = "roster";
   let currentDate = todayISO();
+  const inviteToken = new URLSearchParams(location.search).get("invite");
 
   function renderLogin(errMsg) {
     app.innerHTML = `
@@ -202,6 +206,25 @@
     else await sb.from("platoon_shift_plan").insert({ platoon_id: platoonId, week_start: weekStart, shift: shift || null });
   }
 
+  async function getBaseLocation() {
+    const { data } = await sb.from("settings").select("*").eq("key", "base_location").maybeSingle();
+    return data ? data.value : null;
+  }
+  async function setBaseLocation(loc) {
+    const { data: existing } = await sb.from("settings").select("*").eq("key", "base_location").maybeSingle();
+    if (existing) await sb.from("settings").update({ value: loc }).eq("id", existing.id);
+    else await sb.from("settings").insert({ key: "base_location", value: loc });
+  }
+  function haversineDistanceMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
   async function bootApp() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) { renderLogin(); return; }
@@ -231,6 +254,7 @@
     ROTATION = await getRotation(UNITS);
     PLATOONS = await loadPlatoons();
     SQUADS = await loadSquads();
+    BASE_LOCATION = await getBaseLocation();
 
     render();
   }
@@ -247,18 +271,78 @@
   async function rerenderRosterKeepScroll() {
     const y = window.scrollY;
     await refreshRosterData();
-    renderRoster();
+    await renderRoster();
     window.scrollTo(0, y);
   }
 
-  function renderRoster() {
+  async function loadPendingInvites() {
+    const { data } = await sb.from("invites").select("*").eq("used", false).order("created_at", { ascending:false });
+    return data || [];
+  }
+
+  async function renderRoster() {
     const main = document.getElementById("main");
+    main.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
+    const pendingInvites = await loadPendingInvites();
     main.innerHTML = `
+      <div class="formCard">
+        <div style="font-weight:800;margin-bottom:8px">🔗 دعوة فرد جديد للتسجيل الذاتي</div>
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">كل رابط يشتغل مرة وحدة بس — ابعته لشخص واحد محدد فقط.</div>
+        <button id="genInviteBtn">توليد رابط دعوة جديد</button>
+        <div id="inviteResultBox"></div>
+        ${pendingInvites.length > 0 ? `
+          <div style="margin-top:12px">
+            <div style="font-size:12px;color:#8A97A8;margin-bottom:6px">روابط بانتظار التسجيل (${pendingInvites.length}):</div>
+            ${pendingInvites.map(inv => `
+              <div class="smallMember">
+                <span style="font-size:11px;font-family:monospace">${escapeHtml(inv.token.slice(0,10))}...</span>
+                <span style="display:flex;align-items:center;gap:6px">
+                  <button class="smallBtn" data-copyinvite="${inv.token}">📋 نسخ</button>
+                  <button class="xbtn" data-cancelinvite="${inv.id}">🗑️</button>
+                </span>
+              </div>
+            `).join("")}
+          </div>
+        ` : ""}
+      </div>
       <div class="rosterGrid" style="grid-template-columns:1fr">
         ${UNITS.map(u => renderUnitBlock(u)).join("")}
       </div>
     `;
     wireRosterEvents(main);
+    wireInviteEvents(main);
+  }
+
+  function wireInviteEvents(main) {
+    const genBtn = document.getElementById("genInviteBtn");
+    if (genBtn) genBtn.onclick = async () => {
+      genBtn.disabled = true; genBtn.textContent = "...";
+      const token = crypto.randomUUID().replace(/-/g, "") + Math.random().toString(36).slice(2, 8);
+      await sb.from("invites").insert({ token });
+      const url = `${location.origin}${location.pathname}?invite=${token}`;
+      document.getElementById("inviteResultBox").innerHTML = `
+        <div class="verifyBox" style="margin-top:10px">
+          <input type="text" readonly value="${escapeHtml(url)}" style="flex:1;font-size:11px" onclick="this.select()" />
+          <button class="miniBtn" data-copyurl="${escapeHtml(url)}">نسخ</button>
+        </div>
+      `;
+      const copyBtn = document.querySelector("[data-copyurl]");
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(url);
+        copyBtn.textContent = "✔ انتسخ";
+      };
+      genBtn.disabled = false; genBtn.textContent = "توليد رابط دعوة جديد";
+    };
+    main.querySelectorAll("[data-copyinvite]").forEach(b => b.addEventListener("click", () => {
+      const url = `${location.origin}${location.pathname}?invite=${b.getAttribute("data-copyinvite")}`;
+      navigator.clipboard.writeText(url);
+      b.textContent = "✔ انتسخ";
+    }));
+    main.querySelectorAll("[data-cancelinvite]").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm("إلغاء هذا الرابط؟")) return;
+      await sb.from("invites").delete().eq("id", b.getAttribute("data-cancelinvite"));
+      await rerenderRosterKeepScroll();
+    }));
   }
 
   function renderUnitBlock(u) {
@@ -515,6 +599,14 @@
         <div style="text-align:left"><div style="font-size:12px;color:#8A97A8">مستريحة</div><div style="font-size:13px;color:#8A97A8">${escapeHtml(offDutyUnit?.name||"")}</div></div>
       </div>
 
+      <div class="formCard" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:800;font-size:13px">📍 موقع القاعدة</div>
+          <div style="font-size:12px;color:#8A97A8">${BASE_LOCATION ? `نطاق القبول: ${BASE_LOCATION.radius} متر — التحقق من الموقع مفعّل` : "ما تحدد بعد — التحقق من الموقع غير مفعّل حاليًا"}</div>
+        </div>
+        <button class="smallBtn" id="setBaseLocBtn">${BASE_LOCATION ? "تعديل الموقع" : "تحديد من الخريطة"}</button>
+      </div>
+
       <div class="planBox">
         <div style="font-weight:800;margin-bottom:8px">🗓️ خطة نوبات الأسبوع (من ${monthNameAr(weekStart)})</div>
         <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">حدد أي فصيلة تاخد أي نوبة — بينطبق تلقائيًا على كل أيام هالأسبوع لهاي السرية.</div>
@@ -578,6 +670,9 @@
       renderDuty();
     }));
     main.querySelectorAll("[data-startverify]").forEach(btn => btn.addEventListener("click", () => openVerify(btn.getAttribute("data-startverify"))));
+
+    const setBaseBtn = document.getElementById("setBaseLocBtn");
+    if (setBaseBtn) setBaseBtn.onclick = () => openBaseLocationPicker();
   }
 
   function renderMemberRow(member, rec, shift, now, isToday) {
@@ -602,7 +697,14 @@
     }
     let geoHtml = "";
     if (status === "present" && rec?.geo) {
-      geoHtml = `<a class="geoLink" href="https://www.google.com/maps?q=${rec.geo.lat},${rec.geo.lng}" target="_blank">📍 موقع الحضور على الخريطة (دقة ~${rec.geo.accuracy} م)</a>`;
+      const g = rec.geo;
+      let rangeHtml = "";
+      if (typeof g.in_range === "boolean") {
+        rangeHtml = g.in_range
+          ? `<div style="font-size:11px;color:#2FAE60;margin-top:2px">✔ داخل نطاق القاعدة</div>`
+          : `<div style="font-size:11px;color:#D64545;margin-top:2px">⚠️ خارج نطاق القاعدة (تقريبًا ${g.distance_m} م)</div>`;
+      }
+      geoHtml = `<a class="geoLink" href="https://www.google.com/maps?q=${g.lat},${g.lng}" target="_blank">📍 موقع الحضور على الخريطة (دقة ~${g.accuracy} م)</a>${rangeHtml}`;
     } else if (status === "present" && rec?.verified) {
       geoHtml = `<div class="geoNote">لم يتم تحديد الموقع (رفض الإذن أو غير متاح)</div>`;
     }
@@ -653,9 +755,73 @@
       const btn = document.getElementById(`pinConfirm-${memberId}`);
       btn.disabled = true; btn.textContent = "...جارِ تحديد الموقع";
       const geo = await getGeo();
+      if (geo && BASE_LOCATION) {
+        const dist = haversineDistanceMeters(geo.lat, geo.lng, BASE_LOCATION.lat, BASE_LOCATION.lng);
+        geo.distance_m = Math.round(dist);
+        geo.in_range = dist <= BASE_LOCATION.radius;
+      }
       const now = new Date();
       const hh = pad(now.getHours()), mm = pad(now.getMinutes());
       await upsertAttendance(memberId, currentDate, { status:"present", verified:true, geo, time_in: hh+":"+mm });
+      renderDuty();
+    };
+  }
+
+  function openBaseLocationPicker() {
+    const overlay = document.createElement("div");
+    overlay.id = "mapModalOverlay";
+    overlay.style.cssText = "position:fixed;inset:0;background:#000000cc;z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px";
+    overlay.innerHTML = `
+      <div style="background:#141F2E;border:1px solid #1E2B41;border-radius:14px;padding:16px;max-width:480px;width:100%">
+        <div style="font-weight:800;margin-bottom:8px">📍 حدد موقع القاعدة</div>
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:8px">دوس عالخريطة لتحديد نقطة القاعدة، أو استخدم موقعك الحالي إذا واقف فيها</div>
+        <div id="pickerMap" style="height:280px;border-radius:10px;overflow:hidden;margin-bottom:10px"></div>
+        <button class="smallBtn" id="useMyLocBtn" style="margin-bottom:10px">📌 استخدم موقعي الحالي</button>
+        <div style="font-size:12px;margin-bottom:6px">نصف قطر القبول: <b id="radiusVal">${BASE_LOCATION?.radius || 150}</b> متر</div>
+        <input type="range" id="radiusSlider" min="20" max="1000" step="10" value="${BASE_LOCATION?.radius || 150}" style="width:100%;margin-bottom:12px" />
+        <div style="display:flex;gap:8px">
+          <button id="saveBaseLocBtn" style="flex:1">حفظ</button>
+          <button class="ghost" id="cancelBaseLocBtn" style="flex:1">إلغاء</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const startLat = BASE_LOCATION?.lat ?? 33.8886;
+    const startLng = BASE_LOCATION?.lng ?? 35.4955;
+    const map = L.map("pickerMap").setView([startLat, startLng], BASE_LOCATION ? 16 : 8);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
+
+    let marker = null, circle = null;
+    let picked = BASE_LOCATION ? { lat: startLat, lng: startLng } : null;
+
+    function placeMarker(lat, lng) {
+      picked = { lat, lng };
+      const radius = +document.getElementById("radiusSlider").value;
+      if (marker) marker.setLatLng([lat, lng]); else marker = L.marker([lat, lng]).addTo(map);
+      if (circle) circle.setLatLng([lat, lng]).setRadius(radius); else circle = L.circle([lat, lng], { radius, color: "#E3A008" }).addTo(map);
+    }
+    if (picked) placeMarker(picked.lat, picked.lng);
+
+    map.on("click", (e) => placeMarker(e.latlng.lat, e.latlng.lng));
+
+    document.getElementById("radiusSlider").oninput = (e) => {
+      document.getElementById("radiusVal").textContent = e.target.value;
+      if (circle) circle.setRadius(+e.target.value);
+    };
+
+    document.getElementById("useMyLocBtn").onclick = async () => {
+      const geo = await getGeo();
+      if (geo) { map.setView([geo.lat, geo.lng], 17); placeMarker(geo.lat, geo.lng); }
+    };
+
+    document.getElementById("cancelBaseLocBtn").onclick = () => overlay.remove();
+    document.getElementById("saveBaseLocBtn").onclick = async () => {
+      if (!picked) { alert("دوس عالخريطة أول لتحديد نقطة"); return; }
+      const radius = +document.getElementById("radiusSlider").value;
+      await setBaseLocation({ lat: picked.lat, lng: picked.lng, radius });
+      BASE_LOCATION = await getBaseLocation();
+      overlay.remove();
       renderDuty();
     };
   }
@@ -767,7 +933,120 @@
     `;
   }
 
+  // ---------- Public self-registration (invite link) ----------
+  async function renderInviteFlow(token) {
+    app.innerHTML = `<div class="loading">...جارِ التحقق من الرابط</div>`;
+    const { data: valid, error } = await sb.rpc("validate_invite", { p_token: token });
+    if (error || !valid) {
+      app.innerHTML = `
+        <div class="center"><div class="card">
+          <h1>⚠️ رابط غير صالح</h1>
+          <p>هذا الرابط غير صالح أو تم استخدامه من قبل. تواصل مع المسؤول للحصول على رابط جديد.</p>
+        </div></div>
+      `;
+      return;
+    }
+    const { data: hierarchy } = await sb.rpc("public_hierarchy");
+    if (!hierarchy || hierarchy.length === 0) {
+      app.innerHTML = `
+        <div class="center"><div class="card">
+          <h1>⚠️ لا يوجد هيكل بعد</h1>
+          <p>ما في فصائل أو مجموعات مُعرَّفة بعد. تواصل مع المسؤول.</p>
+        </div></div>
+      `;
+      return;
+    }
+    renderInviteForm(token, hierarchy);
+  }
+
+  function renderInviteForm(token, hierarchy) {
+    const units = [...new Map(hierarchy.map(r => [r.unit_id, r.unit_name])).entries()];
+    app.innerHTML = `
+      <div class="center"><div class="card" style="max-width:420px;text-align:right">
+        <h1 style="text-align:center">📝 تسجيل فرد جديد</h1>
+        <p style="text-align:center">عبّي معلوماتك بالأسفل — رح يتولّد إلك رمز خاص لازم تحفظه.</p>
+        <input type="text" id="regName" placeholder="الاسم الكامل" />
+        <select id="regUnit">
+          <option value="">اختر السرية</option>
+          ${units.map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join("")}
+        </select>
+        <select id="regPlatoon" disabled><option value="">اختر السرية أولًا</option></select>
+        <select id="regSquad" disabled><option value="">اختر الفصيلة أولًا</option></select>
+        <div id="regShiftInfo" style="font-size:12px;color:#8A97A8;margin:-4px 0 10px;text-align:center"></div>
+        <button id="regSubmit" style="width:100%">تسجيل</button>
+        <div id="regErr" class="err"></div>
+      </div></div>
+    `;
+
+    const unitSel = document.getElementById("regUnit");
+    const platoonSel = document.getElementById("regPlatoon");
+    const squadSel = document.getElementById("regSquad");
+    const shiftInfo = document.getElementById("regShiftInfo");
+
+    unitSel.onchange = () => {
+      const uid = unitSel.value;
+      const platoons = [...new Map(hierarchy.filter(r => r.unit_id === uid).map(r => [r.platoon_id, r.platoon_name])).entries()];
+      platoonSel.disabled = !uid;
+      platoonSel.innerHTML = `<option value="">اختر الفصيلة</option>${platoons.map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join("")}`;
+      squadSel.disabled = true;
+      squadSel.innerHTML = `<option value="">اختر الفصيلة أولًا</option>`;
+      shiftInfo.textContent = "";
+    };
+    platoonSel.onchange = () => {
+      const pid = platoonSel.value;
+      const squads = hierarchy.filter(r => r.platoon_id === pid).map(r => [r.squad_id, r.squad_name]);
+      squadSel.disabled = !pid;
+      squadSel.innerHTML = `<option value="">اختر المجموعة</option>${squads.map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join("")}`;
+      shiftInfo.textContent = "";
+    };
+    squadSel.onchange = async () => {
+      const pid = platoonSel.value;
+      if (!pid) return;
+      shiftInfo.textContent = "...جارِ تحديد النوبة الحالية";
+      const { data } = await sb.rpc("public_current_shift", { p_platoon_id: pid });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row || !row.on_duty) {
+        shiftInfo.textContent = "فصيلتك مستريحة هالأسبوع (سريتك مو مناوبة)";
+      } else if (!row.shift) {
+        shiftInfo.textContent = "الفصيلة مناوبة، بس لسا ما تحدد إلها نوبة معيّنة";
+      } else {
+        const s = SHIFTS.find(x => x.id === row.shift);
+        shiftInfo.textContent = `نوبتك الحالية: ${s ? s.label : row.shift} (${s ? s.range : ""})`;
+      }
+    };
+
+    document.getElementById("regSubmit").onclick = async () => {
+      const name = document.getElementById("regName").value.trim();
+      const squadId = squadSel.value;
+      const errEl = document.getElementById("regErr");
+      if (!name) { errEl.textContent = "اكتب اسمك"; return; }
+      if (!squadId) { errEl.textContent = "اختر المجموعة"; return; }
+      errEl.textContent = "";
+      const btn = document.getElementById("regSubmit");
+      btn.disabled = true; btn.textContent = "...";
+      const { data: pin, error } = await sb.rpc("register_member", { p_token: token, p_name: name, p_squad_id: squadId });
+      if (error || !pin) {
+        btn.disabled = false; btn.textContent = "تسجيل";
+        errEl.textContent = "صار خطأ — ممكن الرابط استُخدم قبلك. جرب تحدّث الصفحة.";
+        return;
+      }
+      renderInviteSuccess(name, pin);
+    };
+  }
+
+  function renderInviteSuccess(name, pin) {
+    app.innerHTML = `
+      <div class="center"><div class="card">
+        <h1>✅ تم التسجيل يا ${escapeHtml(name)}</h1>
+        <p>هذا رمزك الخاص — احفظه منيح، رح تحتاجه كل يوم لتأكيد حضورك:</p>
+        <div style="font-size:32px;font-weight:800;letter-spacing:6px;color:#E3A008;background:#141F2E;border:1px solid #2A3547;border-radius:10px;padding:16px;margin-bottom:14px">${escapeHtml(pin)}</div>
+        <p style="font-size:12px">ما رح تقدر تشوف هالرمز مرة ثانية من هون — خذ لقطة شاشة أو احفظه بمكان أمين.</p>
+      </div></div>
+    `;
+  }
+
   (async () => {
+    if (inviteToken) { await renderInviteFlow(inviteToken); return; }
     const { data: { session } } = await sb.auth.getSession();
     if (session) await bootApp();
     else renderLogin();
