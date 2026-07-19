@@ -124,7 +124,6 @@
   let BASE_LOCATION = null;
   let currentTab = "dashboard";
   let currentDate = todayISO();
-  const inviteToken = new URLSearchParams(location.search).get("invite");
   const checkinMode = new URLSearchParams(location.search).get("checkin");
 
   function renderLogin(errMsg) {
@@ -279,15 +278,9 @@
     window.scrollTo(0, y);
   }
 
-  async function loadPendingInvites() {
-    const { data } = await sb.from("invites").select("*").eq("used", false).order("created_at", { ascending:false });
-    return data || [];
-  }
-
   async function renderRoster() {
     const main = document.getElementById("main");
     main.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
-    const pendingInvites = await loadPendingInvites();
     main.innerHTML = `
       <div class="formCard">
         <div style="font-weight:800;margin-bottom:8px">🔍 بحث سريع عن فرد</div>
@@ -296,33 +289,12 @@
       </div>
 
       <div class="formCard">
-        <div style="font-weight:800;margin-bottom:8px">🪪 رابط تسجيل الحضور اليومي (ثابت، للجميع)</div>
-        <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">ابعت هالرابط مرة وحدة لكل الأفراد (بمجموعة أو جدار إعلانات) — كل واحد بيدخل باسمه ورمزه الخاص فيه.</div>
+        <div style="font-weight:800;margin-bottom:8px">🪪 رابط التطبيق الوحيد للأفراد (تسجيل أول مرة + حضور يومي)</div>
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">رابط واحد ثابت للجميع — أول مرة بيسجل فيها الفرد معلوماته بنفسه، وبعدين بيصير متل تطبيق عادي بيفتحله عليه مباشرة كل يوم.</div>
         <div class="verifyBox">
           <input type="text" readonly value="${escapeHtml(location.origin + location.pathname)}?checkin=1" style="flex:1;font-size:11px" onclick="this.select()" />
           <button class="miniBtn" id="copyCheckinLinkBtn">نسخ</button>
         </div>
-      </div>
-
-      <div class="formCard">
-        <div style="font-weight:800;margin-bottom:8px">🔗 دعوة فرد جديد للتسجيل الذاتي</div>
-        <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">كل رابط يشتغل مرة وحدة بس — ابعته لشخص واحد محدد فقط.</div>
-        <button id="genInviteBtn">توليد رابط دعوة جديد</button>
-        <div id="inviteResultBox"></div>
-        ${pendingInvites.length > 0 ? `
-          <div style="margin-top:12px">
-            <div style="font-size:12px;color:#8A97A8;margin-bottom:6px">روابط بانتظار التسجيل (${pendingInvites.length}):</div>
-            ${pendingInvites.map(inv => `
-              <div class="smallMember">
-                <span style="font-size:11px;font-family:monospace">${escapeHtml(inv.token.slice(0,10))}...</span>
-                <span style="display:flex;align-items:center;gap:6px">
-                  <button class="smallBtn" data-copyinvite="${inv.token}">📋 نسخ</button>
-                  <button class="xbtn" data-cancelinvite="${inv.id}">🗑️</button>
-                </span>
-              </div>
-            `).join("")}
-          </div>
-        ` : ""}
       </div>
       <div class="rosterGrid" style="grid-template-columns:1fr">
         ${UNITS.map(u => renderUnitBlock(u)).join("")}
@@ -362,35 +334,6 @@
       navigator.clipboard.writeText(`${location.origin}${location.pathname}?checkin=1`);
       copyCheckinBtn.textContent = "✔ انتسخ";
     };
-    const genBtn = document.getElementById("genInviteBtn");
-    if (genBtn) genBtn.onclick = async () => {
-      genBtn.disabled = true; genBtn.textContent = "...";
-      const token = crypto.randomUUID().replace(/-/g, "") + Math.random().toString(36).slice(2, 8);
-      await sb.from("invites").insert({ token });
-      const url = `${location.origin}${location.pathname}?invite=${token}`;
-      document.getElementById("inviteResultBox").innerHTML = `
-        <div class="verifyBox" style="margin-top:10px">
-          <input type="text" readonly value="${escapeHtml(url)}" style="flex:1;font-size:11px" onclick="this.select()" />
-          <button class="miniBtn" data-copyurl="${escapeHtml(url)}">نسخ</button>
-        </div>
-      `;
-      const copyBtn = document.querySelector("[data-copyurl]");
-      copyBtn.onclick = () => {
-        navigator.clipboard.writeText(url);
-        copyBtn.textContent = "✔ انتسخ";
-      };
-      genBtn.disabled = false; genBtn.textContent = "توليد رابط دعوة جديد";
-    };
-    main.querySelectorAll("[data-copyinvite]").forEach(b => b.addEventListener("click", () => {
-      const url = `${location.origin}${location.pathname}?invite=${b.getAttribute("data-copyinvite")}`;
-      navigator.clipboard.writeText(url);
-      b.textContent = "✔ انتسخ";
-    }));
-    main.querySelectorAll("[data-cancelinvite]").forEach(b => b.addEventListener("click", async () => {
-      if (!confirm("إلغاء هذا الرابط؟")) return;
-      await sb.from("invites").delete().eq("id", b.getAttribute("data-cancelinvite"));
-      await rerenderRosterKeepScroll();
-    }));
   }
 
   function renderUnitBlock(u) {
@@ -1146,19 +1089,39 @@
     `;
   }
 
-  // ---------- Public self-registration (invite link) ----------
-  async function renderInviteFlow(token) {
-    app.innerHTML = `<div class="loading">...جارِ التحقق من الرابط</div>`;
-    const { data: valid, error } = await sb.rpc("validate_invite", { p_token: token });
-    if (error || !valid) {
-      app.innerHTML = `
-        <div class="center"><div class="card">
-          <h1>⚠️ رابط غير صالح</h1>
-          <p>هذا الرابط غير صالح أو تم استخدامه من قبل. تواصل مع المسؤول للحصول على رابط جديد.</p>
-        </div></div>
-      `;
-      return;
+  // ---------- Public self-service: register once, then auto-login like an app ----------
+  const CREDS_KEY = "duty_member_creds";
+  function saveCreds(memberId, pin) { localStorage.setItem(CREDS_KEY, JSON.stringify({ member_id: memberId, pin })); }
+  function loadCreds() { try { return JSON.parse(localStorage.getItem(CREDS_KEY) || "null"); } catch { return null; } }
+  function clearCreds() { localStorage.removeItem(CREDS_KEY); }
+
+  async function renderCheckinEntry() {
+    const saved = loadCreds();
+    if (saved && saved.member_id && saved.pin) {
+      app.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
+      const { data } = await sb.rpc("member_info", { p_member_id: saved.member_id, p_pin: saved.pin });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) { renderCheckinInfo(row, saved.pin); return; }
+      clearCreds();
     }
+    renderCheckinChoice();
+  }
+
+  function renderCheckinChoice() {
+    app.innerHTML = `
+      <div class="center"><div class="card" style="max-width:400px;text-align:center">
+        <h1>🪪 سجلّ الدوام</h1>
+        <p>أول مرة بتفتح هالرابط؟</p>
+        <button id="choiceRegister" style="width:100%;margin-bottom:10px">🆕 أول مرة، سجّل معلوماتك</button>
+        <button class="ghost" id="choiceLogin" style="width:100%">🔑 عندي حساب، دخول بالاسم والرمز</button>
+      </div></div>
+    `;
+    document.getElementById("choiceRegister").onclick = () => renderRegisterForm();
+    document.getElementById("choiceLogin").onclick = () => renderCheckinLogin();
+  }
+
+  async function renderRegisterForm() {
+    app.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
     const { data: hierarchy } = await sb.rpc("public_hierarchy");
     if (!hierarchy || hierarchy.length === 0) {
       app.innerHTML = `
@@ -1169,10 +1132,6 @@
       `;
       return;
     }
-    renderInviteForm(token, hierarchy);
-  }
-
-  function renderInviteForm(token, hierarchy) {
     const units = [...new Map(hierarchy.map(r => [r.unit_id, r.unit_name])).entries()];
     app.innerHTML = `
       <div class="center"><div class="card" style="max-width:420px;text-align:right">
@@ -1188,8 +1147,11 @@
         <div id="regShiftInfo" style="font-size:12px;color:#8A97A8;margin:-4px 0 10px;text-align:center"></div>
         <button id="regSubmit" style="width:100%">تسجيل</button>
         <div id="regErr" class="err"></div>
+        <button class="linkbtn" id="regBackBtn" style="width:100%;margin-top:10px">🔙 رجوع</button>
       </div></div>
     `;
+
+    document.getElementById("regBackBtn").onclick = () => renderCheckinChoice();
 
     const unitSel = document.getElementById("regUnit");
     const platoonSel = document.getElementById("regPlatoon");
@@ -1237,28 +1199,36 @@
       errEl.textContent = "";
       const btn = document.getElementById("regSubmit");
       btn.disabled = true; btn.textContent = "...";
-      const { data: pin, error } = await sb.rpc("register_member", { p_token: token, p_name: name, p_squad_id: squadId });
-      if (error || !pin) {
+      const { data, error } = await sb.rpc("self_register", { p_name: name, p_squad_id: squadId });
+      const result = Array.isArray(data) ? data[0] : data;
+      if (error || !result) {
         btn.disabled = false; btn.textContent = "تسجيل";
-        errEl.textContent = "صار خطأ — ممكن الرابط استُخدم قبلك. جرب تحدّث الصفحة.";
+        errEl.textContent = "صار خطأ، جرب مرة ثانية.";
         return;
       }
-      renderInviteSuccess(name, pin);
+      saveCreds(result.member_id, result.pin);
+      renderRegisterSuccess(name, result.pin, result.member_id);
     };
   }
 
-  function renderInviteSuccess(name, pin) {
+  function renderRegisterSuccess(name, pin, memberId) {
     app.innerHTML = `
       <div class="center"><div class="card">
         <h1>✅ تم التسجيل يا ${escapeHtml(name)}</h1>
-        <p>هذا رمزك الخاص — احفظه منيح، رح تحتاجه كل يوم لتأكيد حضورك:</p>
+        <p>هذا رمزك الخاص — احفظه منيح، بتحتاجه إذا فتحت من جهاز تاني:</p>
         <div style="font-size:32px;font-weight:800;letter-spacing:6px;color:#E3A008;background:#141F2E;border:1px solid #2A3547;border-radius:10px;padding:16px;margin-bottom:14px">${escapeHtml(pin)}</div>
-        <p style="font-size:12px">ما رح تقدر تشوف هالرمز مرة ثانية من هون — خذ لقطة شاشة أو احفظه بمكان أمين.</p>
+        <p style="font-size:12px">من هالجهاز، رح يفتحلك التطبيق عليك مباشرة من بعد هلق، بدون ما تحتاج تكتب اسمك أو رمزك مرة ثانية.</p>
+        <button id="regContinueBtn" style="width:100%;margin-top:10px">متابعة</button>
       </div></div>
     `;
+    document.getElementById("regContinueBtn").onclick = async () => {
+      const { data } = await sb.rpc("member_info", { p_member_id: memberId, p_pin: pin });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) renderCheckinInfo(row, pin);
+    };
   }
 
-  // ---------- Public daily self check-in (name + PIN, fixed link) ----------
+  // ---------- Public daily self check-in (name + PIN, manual fallback for a new device) ----------
   function renderCheckinLogin(prefill) {
     app.innerHTML = `
       <div class="center"><div class="card" style="max-width:400px;text-align:right">
@@ -1268,8 +1238,10 @@
         <input type="text" id="ciPin" placeholder="الرمز الشخصي (٤ أرقام)" inputmode="numeric" maxlength="4" />
         <button id="ciSubmit" style="width:100%">دخول</button>
         <div id="ciErr" class="err"></div>
+        <button class="linkbtn" id="ciChoiceBackBtn" style="width:100%;margin-top:10px">🔙 رجوع</button>
       </div></div>
     `;
+    document.getElementById("ciChoiceBackBtn").onclick = () => renderCheckinChoice();
     document.getElementById("ciSubmit").onclick = async () => {
       const name = document.getElementById("ciName").value.trim();
       const pin = document.getElementById("ciPin").value.trim();
@@ -1285,8 +1257,20 @@
         errEl.textContent = "الاسم أو الرمز غير صحيح، جرب مرة ثانية.";
         return;
       }
+      saveCreds(row.member_id, pin);
       renderCheckinInfo(row, pin);
     };
+  }
+
+  function isNowWithinShift(shiftId) {
+    const s = SHIFTS.find(x => x.id === shiftId);
+    if (!s) return null;
+    const start = new Date(`${todayISO()}T${pad(s.start)}:00:00`);
+    const end = new Date(start.getTime() + 8 * 3600 * 1000);
+    const now = new Date();
+    if (now < start) return "before";
+    if (now >= end) return "after";
+    return "within";
   }
 
   function renderCheckinInfo(row, pin) {
@@ -1296,19 +1280,26 @@
     else { const s = SHIFTS.find(x => x.id === row.shift); shiftText = `${s ? s.label : row.shift} (${s ? s.range : ""})`; }
 
     let statusBox;
+    const shiftWindow = (row.on_duty && row.shift) ? isNowWithinShift(row.shift) : null;
     if (row.today_status === "present") {
       const rangeHtml = typeof row.today_in_range === "boolean"
         ? (row.today_in_range
             ? `<div style="font-size:12px;color:#2FAE60;margin-top:4px">✔ داخل نطاق القاعدة</div>`
             : `<div style="font-size:12px;color:#D64545;margin-top:4px">⚠️ خارج نطاق القاعدة (~${row.today_distance_m} م)</div>`)
         : "";
+      const endedNote = shiftWindow === "after" ? `<div style="font-size:12px;color:#8A97A8;margin-top:6px">🌙 نوبتك خلصت لهلق</div>` : "";
       statusBox = `
         <div class="formCard" style="text-align:center">
           <div style="font-weight:800;color:#2FAE60">✅ أكدت حضورك اليوم الساعة ${escapeHtml(row.today_time_in||"")}</div>
-          ${rangeHtml}
+          ${rangeHtml}${endedNote}
         </div>`;
     } else if (row.today_status && REQUEST_TYPES.includes(row.today_status)) {
       statusBox = `<div class="formCard" style="text-align:center"><div style="font-weight:800;color:${STATUS[row.today_status].color}">📋 عندك ${STATUS[row.today_status].label} مسجّلة اليوم</div></div>`;
+    } else if (shiftWindow === "before") {
+      const s = SHIFTS.find(x => x.id === row.shift);
+      statusBox = `<div class="formCard" style="text-align:center"><div style="font-weight:800;color:#8A97A8">⏳ نوبتك لسا ما بلشت — بتبلش الساعة ${s?.range||""}</div></div>`;
+    } else if (shiftWindow === "after") {
+      statusBox = `<div class="formCard" style="text-align:center"><div style="font-weight:800;color:#8A97A8">🌙 نوبتك خلصت لهلق</div></div>`;
     } else {
       statusBox = `<button id="ciConfirmBtn" style="width:100%">📍 تأكيد الحضور الآن</button>`;
     }
@@ -1326,9 +1317,66 @@
         </div>
         ${statusBox}
         <div id="ciConfirmErr" class="err"></div>
-        <button class="linkbtn" id="ciBackBtn" style="width:100%;margin-top:10px">🔄 مو أنا — رجعني لصفحة الدخول</button>
+
+        <div class="formCard">
+          <div style="font-weight:800;cursor:pointer" id="toggleReqForm">📋 عندي عذر (مرض / سفر / إجازة / عذر) ▾</div>
+          <div id="reqFormBox" style="display:none;margin-top:10px">
+            <select id="reqType">
+              <option value="sick">مرض</option>
+              <option value="travel">سفر</option>
+              <option value="leave">إجازة</option>
+              <option value="excuse">عذر</option>
+            </select>
+            <input type="date" id="reqDate" value="${todayISO()}" />
+            <input type="text" id="reqNote" placeholder="ملاحظة (اختياري)" />
+            <button id="reqSubmitBtn" style="width:100%">إرسال الطلب</button>
+            <div id="reqErr" class="err"></div>
+          </div>
+        </div>
+
+        <div class="formCard">
+          <div style="font-weight:800;margin-bottom:8px">📜 طلباتي الأخيرة</div>
+          <div id="myRequestsList" style="font-size:12px;color:#8A97A8">...جارِ التحميل</div>
+        </div>
+
+        <button class="linkbtn" id="ciBackBtn" style="width:100%;margin-top:10px">🔄 مو أنا — سجّل خروج من هالجهاز</button>
       </div></div>
     `;
+
+    const REQ_STATUS_LABELS = { pending:"⏳ قيد الانتظار", approved:"✅ تمت الموافقة", rejected:"❌ مرفوض" };
+    async function loadMyRequests() {
+      const box = document.getElementById("myRequestsList");
+      const { data } = await sb.rpc("member_my_requests", { p_member_id: row.member_id, p_pin: pin });
+      if (!data || data.length === 0) { box.innerHTML = `<div style="color:#5B6779">ما قدّمت أي طلب لهلق</div>`; return; }
+      box.innerHTML = data.map(r => `
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1E2B41">
+          <span>${STATUS[r.type]?.label || r.type} — ${r.date}</span>
+          <span>${REQ_STATUS_LABELS[r.status] || r.status}</span>
+        </div>
+      `).join("");
+    }
+    loadMyRequests();
+
+    document.getElementById("toggleReqForm").onclick = () => {
+      const box = document.getElementById("reqFormBox");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    };
+    document.getElementById("reqSubmitBtn").onclick = async () => {
+      const type = document.getElementById("reqType").value;
+      const date = document.getElementById("reqDate").value;
+      const note = document.getElementById("reqNote").value.trim();
+      const errEl = document.getElementById("reqErr");
+      if (!date) { errEl.textContent = "اختر التاريخ"; return; }
+      errEl.textContent = "";
+      const btn = document.getElementById("reqSubmitBtn");
+      btn.disabled = true; btn.textContent = "...";
+      const { error } = await sb.rpc("submit_leave_request", { p_member_id: row.member_id, p_pin: pin, p_type: type, p_date: date, p_note: note || null });
+      btn.disabled = false; btn.textContent = "إرسال الطلب";
+      if (error) { errEl.textContent = "صار خطأ، جرب مرة ثانية."; return; }
+      document.getElementById("reqNote").value = "";
+      document.getElementById("reqFormBox").style.display = "none";
+      loadMyRequests();
+    };
 
     const confirmBtn = document.getElementById("ciConfirmBtn");
     if (confirmBtn) confirmBtn.onclick = async () => {
@@ -1354,12 +1402,11 @@
       renderCheckinInfo(row, pin);
     };
 
-    document.getElementById("ciBackBtn").onclick = () => renderCheckinLogin({ name: row.member_name });
+    document.getElementById("ciBackBtn").onclick = () => { clearCreds(); renderCheckinChoice(); };
   }
 
   (async () => {
-    if (inviteToken) { await renderInviteFlow(inviteToken); return; }
-    if (checkinMode) { renderCheckinLogin(); return; }
+    if (checkinMode) { await renderCheckinEntry(); return; }
     const { data: { session } } = await sb.auth.getSession();
     if (session) await bootApp();
     else renderLogin();
