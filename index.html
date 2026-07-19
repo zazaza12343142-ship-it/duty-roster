@@ -121,7 +121,7 @@
 
   let UNITS = [], MEMBERS = [], ROTATION = null, PLATOONS = [], SQUADS = [];
   let BASE_LOCATION = null;
-  let currentTab = "roster";
+  let currentTab = "dashboard";
   let currentDate = todayISO();
   const inviteToken = new URLSearchParams(location.search).get("invite");
 
@@ -239,6 +239,7 @@
           </div>
         </div>
         <div class="tabs">
+          <button class="tabBtn" data-tab="dashboard">🏠 الرئيسية</button>
           <button class="tabBtn" data-tab="duty">الدوام اليومي</button>
           <button class="tabBtn" data-tab="requests">الطلبات</button>
           <button class="tabBtn" data-tab="roster">الطاقم</button>
@@ -261,7 +262,8 @@
 
   function render() {
     document.querySelectorAll(".tabBtn").forEach(b => b.classList.toggle("active", b.getAttribute("data-tab") === currentTab));
-    if (currentTab === "roster") renderRoster();
+    if (currentTab === "dashboard") renderDashboard();
+    else if (currentTab === "roster") renderRoster();
     else if (currentTab === "requests") renderRequestsTab();
     else renderDuty();
   }
@@ -538,6 +540,112 @@
     }));
   }
 
+
+  // ---------- Dashboard ----------
+  async function renderDashboard() {
+    const main = document.getElementById("main");
+    main.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
+
+    const today = todayISO();
+    const onDutyUnitId = getOnDutyUnitId(UNITS, ROTATION, today);
+    const onDutyUnit = UNITS.find(u => u.id === onDutyUnitId) || UNITS[0];
+    const weekStart = getWeekStart(today, ROTATION);
+    const planRows = await loadShiftPlan(weekStart);
+    const records = await loadAttendance(today);
+    const allRequests = await loadRequests();
+    const recByMember = {};
+    records.forEach(r => recByMember[r.member_id] = r);
+
+    const onDutyPlatoons = PLATOONS.filter(p => p.unit_id === onDutyUnitId);
+    function membersOfPlatoon(platoonId) {
+      const squadIds = SQUADS.filter(s => s.platoon_id === platoonId).map(s => s.id);
+      return MEMBERS.filter(m => squadIds.includes(m.squad_id));
+    }
+
+    let totalCovered = 0, totalPresent = 0, totalLeave = 0, totalAbsent = 0, totalPending = 0;
+    const pendingMembers = [];
+    const platoonStats = onDutyPlatoons.map(p => {
+      const planned = planRows.find(r => r.platoon_id === p.id)?.shift;
+      const mems = planned ? membersOfPlatoon(p.id) : [];
+      let present = 0, leave = 0, absent = 0, pending = 0;
+      mems.forEach(m => {
+        const st = recByMember[m.id]?.status;
+        if (st === "present") present++;
+        else if (st === "absent") absent++;
+        else if (REQUEST_TYPES.includes(st)) leave++;
+        else { pending++; pendingMembers.push(m.name); }
+      });
+      totalCovered += mems.length; totalPresent += present; totalLeave += leave; totalAbsent += absent; totalPending += pending;
+      return { name: p.name, planned, total: mems.length, present, leave, absent, pending };
+    });
+
+    const pendingRequestsCount = allRequests.filter(r => r.status === "pending").length;
+    const attendancePct = totalCovered > 0 ? Math.round((totalPresent / totalCovered) * 100) : 0;
+
+    main.innerHTML = `
+      <div class="dutyBanner">
+        <div><div class="dutyLabel">${dayNameAr(today)} — ${monthNameAr(today)}</div><div class="dutyUnit">${escapeHtml(onDutyUnit?.name||"")} مناوبة اليوم</div></div>
+        <div style="text-align:left"><div style="font-size:26px;font-weight:800;color:${attendancePct>=80?'#2FAE60':attendancePct>=50?'#E3A008':'#D64545'}">${attendancePct}%</div><div style="font-size:11px;color:#8A97A8">نسبة الحضور</div></div>
+      </div>
+
+      <div class="rosterGrid" style="grid-template-columns:repeat(2,1fr);gap:10px">
+        <div class="formCard" style="text-align:center">
+          <div style="font-size:24px;font-weight:800;color:#2FAE60">${totalPresent}</div>
+          <div style="font-size:12px;color:#8A97A8">حاضر</div>
+        </div>
+        <div class="formCard" style="text-align:center">
+          <div style="font-size:24px;font-weight:800;color:#D64545">${totalAbsent}</div>
+          <div style="font-size:12px;color:#8A97A8">غايب</div>
+        </div>
+        <div class="formCard" style="text-align:center">
+          <div style="font-size:24px;font-weight:800;color:#3B82C4">${totalLeave}</div>
+          <div style="font-size:12px;color:#8A97A8">إجازة/عذر/سفر/مرض</div>
+        </div>
+        <div class="formCard" style="text-align:center">
+          <div style="font-size:24px;font-weight:800;color:#E3A008">${totalPending}</div>
+          <div style="font-size:12px;color:#8A97A8">لسا ما أكدوا</div>
+        </div>
+      </div>
+
+      <div class="formCard" style="cursor:pointer" id="goRequestsCard">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:800;font-size:13px">📨 طلبات بانتظار الموافقة</div>
+            <div style="font-size:12px;color:#8A97A8">دوس لتفتح تبويب الطلبات مباشرة</div>
+          </div>
+          <div style="font-size:22px;font-weight:800;color:${pendingRequestsCount>0?'#E3A008':'#8A97A8'}">${pendingRequestsCount}</div>
+        </div>
+      </div>
+
+      <div class="planBox">
+        <div style="font-weight:800;margin-bottom:10px">📊 الحضور حسب الفصيلة (${escapeHtml(onDutyUnit?.name||"")})</div>
+        ${platoonStats.length === 0 ? `<div class="empty">ما في فصائل بعد</div>` : platoonStats.map(p => {
+          const pct = p.total > 0 ? Math.round((p.present/p.total)*100) : 0;
+          return `
+            <div style="margin-bottom:12px">
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+                <span>${escapeHtml(p.name)}${!p.planned ? ` <span style="color:#5B6779;font-size:11px">(بدون نوبة اليوم)</span>` : ""}</span>
+                <span style="color:#8A97A8">${p.present}/${p.total}</span>
+              </div>
+              <div style="height:8px;background:#1E2B41;border-radius:4px;overflow:hidden">
+                <div style="height:100%;width:${pct}%;background:${pct>=80?'#2FAE60':pct>=50?'#E3A008':'#D64545'}"></div>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+
+      ${pendingMembers.length > 0 ? `
+        <div class="leftoverBox">
+          <div style="font-size:12px;color:#8A97A8;margin-bottom:8px">⏳ لسا ما أكدوا حضورهم اليوم (${pendingMembers.length}):</div>
+          ${pendingMembers.map(n => `<span style="display:inline-block;background:#141F2E;border:1px solid #2A3547;border-radius:8px;padding:4px 8px;margin:3px;font-size:12px">${escapeHtml(n)}</span>`).join("")}
+        </div>
+      ` : ""}
+    `;
+
+    const goReq = document.getElementById("goRequestsCard");
+    if (goReq) goReq.onclick = () => { currentTab = "requests"; render(); };
+  }
 
   // ---------- Duty ----------
   async function loadAttendance(dateISO) {
