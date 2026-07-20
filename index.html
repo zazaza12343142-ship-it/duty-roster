@@ -1163,6 +1163,7 @@
         <h1 style="text-align:center">📝 تسجيل فرد جديد</h1>
         <p style="text-align:center">عبّي معلوماتك بالأسفل — رح يتولّد إلك رمز خاص لازم تحفظه.</p>
         <input type="text" id="regName" placeholder="الاسم الكامل" />
+        <div id="regNameWarn" style="font-size:11.5px;color:#D89A2E;margin:-6px 0 10px;display:none">⚠️ في فرد مسجل بنفس الاسم بالضبط — إذا انت شخص مختلف، أضف اسم العائلة أو لقب مميز حتى ما يصير لبس.</div>
         <select id="regUnit">
           <option value="">اختر السرية</option>
           ${units.map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join("")}
@@ -1177,6 +1178,14 @@
     `;
 
     document.getElementById("regBackBtn").onclick = () => renderCheckinChoice();
+
+    document.getElementById("regName").addEventListener("blur", async (e) => {
+      const name = e.target.value.trim();
+      const warnEl = document.getElementById("regNameWarn");
+      if (!name) { warnEl.style.display = "none"; return; }
+      const { data: exists } = await sb.rpc("check_name_exists", { p_name: name });
+      warnEl.style.display = exists ? "block" : "none";
+    });
 
     const unitSel = document.getElementById("regUnit");
     const platoonSel = document.getElementById("regPlatoon");
@@ -1281,7 +1290,9 @@
       const row = Array.isArray(data) ? data[0] : data;
       if (error || !row) {
         btn.disabled = false; btn.textContent = "دخول";
-        errEl.textContent = "الاسم أو الرمز غير صحيح، جرب مرة ثانية.";
+        errEl.textContent = (error?.message||"").includes("locked")
+          ? "🔒 محاولات كتير خاطئة — جرب بعد دقيقتين."
+          : "الاسم أو الرمز غير صحيح، جرب مرة ثانية.";
         return;
       }
       saveCreds(row.member_id, pin);
