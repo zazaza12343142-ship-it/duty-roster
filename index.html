@@ -1,0 +1,2032 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سجلّ الدوام — النظام الرسمي</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%230B1016' stroke='%23D89A2E' stroke-width='3'/%3E%3Cpath d='M32 14l4.8 10.3 11.2 1.4-8.2 7.9 2.1 11.4L32 39.8l-9.9 5.2 2.1-11.4-8.2-7.9 11.2-1.4z' fill='%23D89A2E'/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0A0F16">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg:#0A0F16; --surface:#131C27; --surface2:#182333; --border:#223247;
+    --ink:#E7ECF2; --muted:#8A97A8; --dim:#5B6779;
+    --accent:#D89A2E; --accent-ink:#0A0F16;
+    --danger:#D64545; --good:#2FAE60;
+  }
+  * { box-sizing: border-box; font-family:'Tajawal', 'Tahoma', sans-serif; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink); background-image:radial-gradient(circle at 50% 0%, #101826 0%, var(--bg) 60%); }
+  h1, h2, h3, .brand, .dutyUnit, button, .tabBtn, .unitTitle { font-family:'Cairo','Tajawal',sans-serif; }
+  .mono { font-family:'JetBrains Mono', monospace; letter-spacing:0.5px; }
+  .center { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn .35s ease; }
+  @keyframes fadeIn { from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:translateY(0)} }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:26px 24px; width:100%; max-width:360px; text-align:center; box-shadow:0 20px 40px -20px #000000aa; }
+  .seal { width:56px; height:56px; margin:0 auto 12px; display:block; }
+  .officialTag { font-size:10.5px; color:var(--dim); letter-spacing:1px; text-transform:uppercase; margin:-10px 0 16px; font-family:'JetBrains Mono',monospace; }
+  h1 { font-size:19px; margin:0 0 6px; font-weight:800; }
+  p { color:var(--muted); font-size:13px; margin-bottom:20px; line-height:1.6; }
+  input, select { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--ink); border-radius:9px; padding:11px 12px; font-size:14px; margin-bottom:10px; transition:border-color .15s; }
+  input:focus, select:focus { outline:none; border-color:var(--accent); }
+  button { background:var(--accent); border:none; color:var(--accent-ink); font-weight:800; border-radius:9px; padding:12px 16px; font-size:14px; cursor:pointer; transition:filter .15s, transform .1s; }
+  button:hover { filter:brightness(1.08); }
+  button:active { transform:scale(.98); }
+  button:disabled { opacity:.55; cursor:default; transform:none; }
+  .err { color:var(--danger); font-size:12px; margin-top:8px; }
+  .ghost { background:none; border:1px solid #3A4658; color:#C7D0DC; }
+  header { position:sticky; top:0; background:#0A0F16ee; backdrop-filter:blur(8px); border-bottom:1px solid var(--border); z-index:10; }
+  .headerTop { padding:14px 16px 0; display:flex; justify-content:space-between; align-items:center; }
+  .brand { font-weight:800; font-size:16px; letter-spacing:.3px; }
+  .tabs { display:flex; gap:16px; padding:10px 16px 0; }
+  .tabBtn { background:none; border:none; color:var(--ink); font-weight:700; font-size:13.5px; padding:8px 2px 10px; cursor:pointer; border-bottom:2px solid transparent; opacity:.5; transition:opacity .15s; }
+  .tabBtn.active { opacity:1; border-bottom-color:var(--accent); }
+  main { max-width:900px; margin:0 auto; padding:16px; }
+  .rosterGrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:14px; }
+  .unitCard { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:16px; }
+  .unitTitle { font-weight:800; font-size:17px; margin-bottom:4px; background:transparent; border:none; border-bottom:2px solid #2A3547; color:#E7ECF2; width:100%; padding:4px 2px; }
+  .memberRow { background:#0F1720; border:1px solid #1E2B41; border-radius:10px; padding:8px; margin-bottom:8px; }
+  .memberRowTop { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13.5px; font-weight:700; }
+  .pinTag { font-size:11px; color:#8A97A8; background:#141F2E; border-radius:6px; padding:3px 7px; cursor:pointer; }
+  .addRow { display:flex; gap:6px; margin-top:10px; }
+  .addRow input { margin-bottom:0; flex:1; }
+  .xbtn { background:none; border:none; color:#5B6779; cursor:pointer; font-size:14px; padding:2px 6px; }
+  .empty { color:#5B6779; font-size:13px; padding:10px 0; text-align:center; background:#141F2E; border:1px dashed #2A3547; border-radius:10px; }
+  .loading { color:#8A97A8; text-align:center; padding:40px; }
+  .dateBar { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .dateMain { font-weight:800; font-size:15px; }
+  .iconbtn { background:#172236; border:1px solid #2A3547; color:#E7ECF2; border-radius:10px; padding:8px 14px; cursor:pointer; font-size:16px; }
+  .linkbtn { background:none; border:none; color:#D89A2E; font-size:12px; cursor:pointer; text-decoration:underline; }
+  .dutyBanner { display:flex; justify-content:space-between; align-items:center; background:linear-gradient(90deg,#2A2108,#0F1720); border:1px solid #4A3A0F; border-radius:12px; padding:12px 16px; margin-bottom:14px; }
+  .dutyLabel { font-size:12px; color:#C7A94A; }
+  .dutyUnit { font-weight:800; font-size:17px; color:#F0C94A; }
+  .shiftGrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); gap:12px; }
+  .shiftCard { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:12px; }
+  .shiftHeader { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #2A3547; padding-bottom:8px; margin-bottom:10px; font-weight:800; }
+  .pillsRow { display:flex; gap:4px; flex-wrap:wrap; margin-top:2px; }
+  .pill { border:1.5px solid; border-radius:8px; padding:5px 8px; cursor:pointer; font-size:12px; background:transparent; font-weight:700; }
+  .pill.active { color:#0F1720; }
+  .assignChip { background:#1E2B41; border:1px dashed #3A4658; color:#C7D0DC; border-radius:8px; padding:5px 9px; font-size:12px; cursor:pointer; margin:3px; }
+  .verifyBox { display:flex; align-items:center; gap:6px; background:#1A1508; border:1px solid #4A3A0F; border-radius:8px; padding:6px 8px; margin-top:6px; }
+  .verifyBox input { width:70px; margin:0; padding:5px 6px; font-size:13px; letter-spacing:2px; }
+  .miniBtn { background:#D89A2E; border:none; color:#0F1720; font-weight:800; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer; }
+  .miniBtnGhost { background:none; border:1px solid #3A4658; color:#C7D0DC; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer; }
+  .timeRow { display:flex; align-items:center; gap:6px; margin-top:8px; border-top:1px dashed #2A3547; padding-top:6px; font-size:12px; color:#8A97A8; }
+  .timeRow input[type=time] { width:auto; margin:0; padding:3px 6px; font-size:12px; }
+  .geoLink { font-size:11px; color:#3B82C4; display:block; margin-top:4px; }
+  .geoNote { font-size:11px; color:#5B6779; margin-top:4px; }
+  .formCard { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:16px; margin-bottom:16px; }
+  .formRow { display:flex; gap:8px; flex-wrap:wrap; }
+  .formRow > * { flex:1; min-width:140px; }
+  .reqCard { background:#141F2E; border:1px solid #1E2B41; border-radius:12px; padding:14px; margin-bottom:8px; }
+  .reqTop { display:flex; justify-content:space-between; align-items:flex-start; }
+  .reqBottom { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
+  .badge { font-size:12px; border-radius:20px; padding:3px 10px; border:1px solid; }
+  .approveBtn { background:#0F2A1B; border:1px solid #2FAE60; color:#2FAE60; border-radius:6px; padding:6px 10px; font-size:12px; font-weight:700; }
+  .rejectBtn { background:#2A1414; border:1px solid #D64545; color:#D64545; border-radius:6px; padding:6px 10px; font-size:12px; font-weight:700; }
+  .platoonCard { background:#101A28; border:1px solid #24334A; border-radius:12px; padding:12px; margin-top:12px; }
+  .platoonHead { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+  .platoonHead input.unitTitle { font-size:15px; border-bottom:2px solid #24334A; }
+  .cmdRow { display:flex; align-items:center; gap:6px; font-size:12px; color:#8A97A8; margin-bottom:10px; }
+  .cmdRow select { margin:0; padding:5px 6px; font-size:12px; flex:1; }
+  .squadCard { background:#0F1720; border:1px solid #1E2B41; border-radius:10px; padding:10px; margin-top:8px; }
+  .squadHead { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
+  .squadHead input.unitTitle { font-size:13.5px; border-bottom:2px solid #1E2B41; }
+  .smallMember { display:flex; justify-content:space-between; align-items:center; background:#141F2E; border-radius:8px; padding:6px 8px; margin-bottom:5px; font-size:12.5px; }
+  .unassignedBox { border:1px dashed #3A4658; border-radius:10px; padding:10px; margin-top:12px; }
+  .smallBtn { background:#1E2B41; border:1px dashed #3A4658; color:#C7D0DC; border-radius:6px; padding:4px 8px; font-size:11px; cursor:pointer; margin:2px; }
+  .planBox { background:#141F2E; border:1px solid #1E2B41; border-radius:14px; padding:14px; margin-bottom:14px; }
+  .planRow { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px dashed #1E2B41; }
+  .planRow:last-child { border-bottom:none; }
+  .planRow select { margin:0; padding:6px 8px; font-size:12.5px; width:auto; min-width:130px; }
+  .leftoverBox { border:1px dashed #3A4658; border-radius:10px; padding:10px; margin-top:12px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">...جارِ التحميل</div></div>
+
+<script>
+  const SUPABASE_URL = "https://zlcbmgaamyxwbhautvah.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpsY2JtZ2FhbXl4d2JoYXV0dmFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMjYxNDYsImV4cCI6MjA5OTgwMjE0Nn0.uGTm3TOgl72gbv3z1_BvxkpysNwIAyuCTJhCb70nkwE";
+  const VAPID_PUBLIC_KEY = "BHMfJZruViGrjFpSdV1tYVuzWuO8CEa7sLwB5g5HlYJpAlP2TlPChUikc5vf4XTDNxWQRFWsDAiYdjYVNm1eN1o";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const app = document.getElementById("app");
+
+  const genPin = () => String(Math.floor(1000 + Math.random() * 9000));
+  const pad = (n) => String(n).padStart(2, "0");
+  const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+  const addDays = (iso, n) => { const d = new Date(iso+"T00:00:00"); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+  const dayNameAr = (iso) => ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"][new Date(iso+"T00:00:00").getDay()];
+  const monthNameAr = (iso) => {
+    const names=["كانون الثاني","شباط","آذار","نيسان","أيار","حزيران","تموز","آب","أيلول","تشرين الأول","تشرين الثاني","كانون الأول"];
+    const d = new Date(iso+"T00:00:00");
+    return `${d.getDate()} ${names[d.getMonth()]} ${d.getFullYear()}`;
+  };
+  const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+  const SHIFTS = [
+    { id:"morning", label:"صباحي", range:"08:00 – 16:00", start:8, color:"#D89A2E" },
+    { id:"evening", label:"مسائي", range:"16:00 – 00:00", start:16, color:"#3B82C4" },
+    { id:"night", label:"ليلي", range:"00:00 – 08:00", start:0, color:"#7C6FE0" },
+  ];
+  const STATUS = {
+    present:{label:"حاضر",color:"#2FAE60"}, absent:{label:"غائب",color:"#D64545"},
+    leave:{label:"إجازة",color:"#3B82C4"}, travel:{label:"سفر",color:"#7C6FE0"},
+    excuse:{label:"عذر",color:"#D89A2E"}, sick:{label:"مرض",color:"#C4643B"},
+  };
+  const REQUEST_TYPES = ["sick","travel","leave","excuse"];
+  const SEAL_SVG = `<svg class="seal" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="32" cy="32" r="30" fill="#0A0F16" stroke="#D89A2E" stroke-width="2.5"/>
+    <circle cx="32" cy="32" r="25" fill="none" stroke="#D89A2E" stroke-width="1" opacity="0.4"/>
+    <path d="M32 14l4.8 10.3 11.2 1.4-8.2 7.9 2.1 11.4L32 39.8l-9.9 5.2 2.1-11.4-8.2-7.9 11.2-1.4z" fill="#D89A2E"/>
+  </svg>`;
+
+  let UNITS = [], MEMBERS = [], ROTATION = null, PLATOONS = [], SQUADS = [];
+  let BASE_LOCATION = null;
+  let currentTab = "dashboard";
+  let currentDate = todayISO();
+  const checkinMode = new URLSearchParams(location.search).get("checkin");
+
+  function renderLogin(errMsg) {
+    app.innerHTML = `
+      <div class="center"><div class="card">
+        <h1>سجلّ الدوام</h1>
+        <p>سجّل الدخول بحسابك للمتابعة</p>
+        <input id="email" type="email" placeholder="الإيميل" />
+        <input id="password" type="password" placeholder="كلمة السر" />
+        <button id="loginBtn" style="width:100%">دخول</button>
+        ${errMsg ? `<div class="err">${errMsg}</div>` : ""}
+      </div></div>
+    `;
+    document.getElementById("loginBtn").onclick = async () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const btn = document.getElementById("loginBtn");
+      btn.disabled = true; btn.textContent = "...";
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) { renderLogin(error.message); return; }
+      await bootApp();
+    };
+  }
+
+  async function ensureDefaultUnits() {
+    const { data } = await sb.from("units").select("*").order("name");
+    if (data && data.length === 0) {
+      const { data: inserted } = await sb.from("units").insert([{ name:"السرية الأولى" }, { name:"السرية الثانية" }]).select();
+      return inserted || [];
+    }
+    return data || [];
+  }
+  async function loadMembers(unitIds) {
+    const { data } = await sb.from("members").select("*").in("unit_id", unitIds).order("created_at");
+    return data || [];
+  }
+  async function getRotation(units) {
+    const { data } = await sb.from("settings").select("*").eq("key","rotation").maybeSingle();
+    if (data) return data.value;
+    const value = { date: todayISO(), onDutyUnit: units[0].id };
+    await sb.from("settings").insert({ key:"rotation", value });
+    return value;
+  }
+  async function loadPlatoons() {
+    const { data } = await sb.from("platoons").select("*").order("name");
+    return data || [];
+  }
+  async function loadSquads() {
+    const { data } = await sb.from("squads").select("*").order("name");
+    return data || [];
+  }
+  async function refreshHierarchy() {
+    MEMBERS = await loadMembers(UNITS.map(u => u.id));
+    PLATOONS = await loadPlatoons();
+    SQUADS = await loadSquads();
+  }
+  function getOnDutyUnitId(units, rotation, dateISO) {
+    const anchor = new Date(rotation.date+"T00:00:00");
+    const target = new Date(dateISO+"T00:00:00");
+    const diffDays = Math.round((target - anchor) / 86400000);
+    const weekIndex = Math.floor(diffDays / 7);
+    const other = units.find(u => u.id !== rotation.onDutyUnit)?.id || rotation.onDutyUnit;
+    const parity = ((weekIndex % 2) + 2) % 2;
+    return parity === 0 ? rotation.onDutyUnit : other;
+  }
+  function getWeekStart(dateISO, rotation) {
+    const anchor = new Date(rotation.date+"T00:00:00");
+    const target = new Date(dateISO+"T00:00:00");
+    const diffDays = Math.round((target - anchor) / 86400000);
+    const weekIndex = Math.floor(diffDays / 7);
+    const start = new Date(anchor.getTime() + weekIndex * 7 * 86400000);
+    return `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`;
+  }
+  async function loadShiftPlan(weekStart) {
+    const { data } = await sb.from("platoon_shift_plan").select("*").eq("week_start", weekStart);
+    return data || [];
+  }
+  async function setPlatoonShift(platoonId, weekStart, shift) {
+    const { data: existing } = await sb.from("platoon_shift_plan").select("*").eq("platoon_id", platoonId).eq("week_start", weekStart).maybeSingle();
+    if (existing) await sb.from("platoon_shift_plan").update({ shift: shift || null }).eq("id", existing.id);
+    else await sb.from("platoon_shift_plan").insert({ platoon_id: platoonId, week_start: weekStart, shift: shift || null });
+  }
+
+  async function getBaseLocation() {
+    const { data } = await sb.from("settings").select("*").eq("key", "base_location").maybeSingle();
+    return data ? data.value : null;
+  }
+  async function setBaseLocation(loc) {
+    const { data: existing } = await sb.from("settings").select("*").eq("key", "base_location").maybeSingle();
+    if (existing) await sb.from("settings").update({ value: loc }).eq("id", existing.id);
+    else await sb.from("settings").insert({ key: "base_location", value: loc });
+  }
+
+  async function getEmergencyBroadcast() {
+    const { data } = await sb.from("settings").select("*").eq("key", "emergency_broadcast").maybeSingle();
+    return data ? data.value : null;
+  }
+  async function setEmergencyBroadcast(message) {
+    const value = { message, sent_at: new Date().toISOString() };
+    const { data: existing } = await sb.from("settings").select("*").eq("key", "emergency_broadcast").maybeSingle();
+    if (existing) await sb.from("settings").update({ value }).eq("id", existing.id);
+    else await sb.from("settings").insert({ key: "emergency_broadcast", value });
+    return value;
+  }
+  async function clearEmergencyBroadcast() {
+    await sb.from("settings").delete().eq("key", "emergency_broadcast");
+  }
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  async function savePushSubscription(memberId, sub) {
+    await sb.from("push_subscriptions").upsert(
+      { member_id: memberId, endpoint: sub.endpoint, subscription: sub.toJSON() },
+      { onConflict: "endpoint" }
+    );
+  }
+
+  async function initPushSilent(memberId) {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
+      await savePushSubscription(memberId, sub);
+    } catch (e) { /* تجاهل بهدوء */ }
+  }
+
+  async function enablePushNotifications(memberId, btn, statusEl) {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || typeof Notification === "undefined") {
+      statusEl.style.color = "#D64545";
+      statusEl.textContent = "المتصفح ما بيدعم الإشعارات على هالجهاز.";
+      return;
+    }
+    btn.disabled = true; btn.textContent = "...";
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") {
+        statusEl.style.color = "#D64545";
+        statusEl.textContent = "لازم توافق على إذن الإشعارات حتى توصلك رسائل الطوارئ.";
+        btn.disabled = false; btn.textContent = "🔔 فعّل إشعارات الطوارئ";
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) });
+      await savePushSubscription(memberId, sub);
+      statusEl.style.color = "#2FAE60";
+      statusEl.textContent = "✔ الإشعارات مفعّلة على هالجهاز.";
+      btn.parentElement.style.display = "none";
+    } catch (e) {
+      statusEl.style.color = "#D64545";
+      statusEl.textContent = "صار خطأ أثناء التفعيل، جرب مرة ثانية.";
+      btn.disabled = false; btn.textContent = "🔔 فعّل إشعارات الطوارئ";
+    }
+  }
+  function haversineDistanceMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  async function bootApp() {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) { renderLogin(); return; }
+
+    app.innerHTML = `
+      <header>
+        <div class="headerTop">
+          <div class="brand">🛡️ سجلّ الدوام</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:12px;color:#8A97A8">${escapeHtml(user.email)}</span>
+            <button class="ghost" id="logoutBtn" style="padding:6px 10px;font-size:12px">خروج</button>
+          </div>
+        </div>
+        <div class="tabs">
+          <button class="tabBtn" data-tab="dashboard">🏠 الرئيسية</button>
+          <button class="tabBtn" data-tab="duty">الدوام اليومي</button>
+          <button class="tabBtn" data-tab="requests">الطلبات</button>
+          <button class="tabBtn" data-tab="roster">الطاقم</button>
+          <button class="tabBtn" data-tab="backup">💾 النسخ الاحتياطي</button>
+        </div>
+      </header>
+      <main id="main"><div class="loading">...جارِ التحميل</div></main>
+    `;
+    document.getElementById("logoutBtn").onclick = async () => { await sb.auth.signOut(); renderLogin(); };
+    document.querySelectorAll(".tabBtn").forEach(b => b.addEventListener("click", () => { currentTab = b.getAttribute("data-tab"); render(); }));
+
+    UNITS = await ensureDefaultUnits();
+    MEMBERS = await loadMembers(UNITS.map(u => u.id));
+    ROTATION = await getRotation(UNITS);
+    PLATOONS = await loadPlatoons();
+    SQUADS = await loadSquads();
+    BASE_LOCATION = await getBaseLocation();
+
+    render();
+  }
+
+  function render() {
+    document.querySelectorAll(".tabBtn").forEach(b => b.classList.toggle("active", b.getAttribute("data-tab") === currentTab));
+    if (currentTab === "dashboard") renderDashboard();
+    else if (currentTab === "roster") renderRoster();
+    else if (currentTab === "requests") renderRequestsTab();
+    else if (currentTab === "backup") renderBackupTab();
+    else renderDuty();
+  }
+
+  // ---------- Roster ----------
+  async function refreshRosterData() { await refreshHierarchy(); }
+  async function rerenderRosterKeepScroll() {
+    const y = window.scrollY;
+    await refreshRosterData();
+    await renderRoster();
+    window.scrollTo(0, y);
+  }
+
+  async function renderRoster() {
+    const main = document.getElementById("main");
+    main.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
+    main.innerHTML = `
+      <div class="formCard">
+        <div style="font-weight:800;margin-bottom:8px">🔍 بحث سريع عن فرد</div>
+        <input type="text" id="rosterSearchInput" placeholder="اكتب اسم الفرد..." />
+        <div id="rosterSearchResults"></div>
+      </div>
+
+      <div class="formCard">
+        <div style="font-weight:800;margin-bottom:8px">🪪 رابط التطبيق الوحيد للأفراد (تسجيل أول مرة + حضور يومي)</div>
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">رابط واحد ثابت للجميع — أول مرة بيسجل فيها الفرد معلوماته بنفسه، وبعدين بيصير متل تطبيق عادي بيفتحله عليه مباشرة كل يوم.</div>
+        <div class="verifyBox">
+          <input type="text" readonly value="${escapeHtml(location.origin + location.pathname)}?checkin=1" style="flex:1;font-size:11px" onclick="this.select()" />
+          <button class="miniBtn" id="copyCheckinLinkBtn">نسخ</button>
+        </div>
+      </div>
+      <div class="rosterGrid" style="grid-template-columns:1fr">
+        ${UNITS.map(u => renderUnitBlock(u)).join("")}
+      </div>
+    `;
+    wireRosterEvents(main);
+    wireInviteEvents(main);
+  }
+
+  function wireInviteEvents(main) {
+    const searchInput = document.getElementById("rosterSearchInput");
+    const resultsBox = document.getElementById("rosterSearchResults");
+    if (searchInput) searchInput.oninput = () => {
+      const q = searchInput.value.trim();
+      if (!q) { resultsBox.innerHTML = ""; return; }
+      const matches = MEMBERS.filter(m => m.name.includes(q));
+      if (matches.length === 0) {
+        resultsBox.innerHTML = `<div style="font-size:12px;color:#8A97A8;margin-top:8px">ما في نتائج</div>`;
+        return;
+      }
+      resultsBox.innerHTML = `<div style="margin-top:8px">` + matches.slice(0, 20).map(m => {
+        const unit = UNITS.find(u => u.id === m.unit_id);
+        const squad = SQUADS.find(s => s.id === m.squad_id);
+        const platoon = squad ? PLATOONS.find(p => p.id === squad.platoon_id) : null;
+        const path = [unit?.name, platoon?.name, squad?.name].filter(Boolean).join(" / ") || "غير مصنّف";
+        return `
+          <div class="smallMember">
+            <span>${escapeHtml(m.name)}</span>
+            <span style="font-size:11px;color:#8A97A8">${escapeHtml(path)}</span>
+          </div>
+        `;
+      }).join("") + `</div>`;
+    };
+
+    const copyCheckinBtn = document.getElementById("copyCheckinLinkBtn");
+    if (copyCheckinBtn) copyCheckinBtn.onclick = () => {
+      navigator.clipboard.writeText(`${location.origin}${location.pathname}?checkin=1`);
+      copyCheckinBtn.textContent = "✔ انتسخ";
+    };
+  }
+
+  function renderUnitBlock(u) {
+    const unitPlatoons = PLATOONS.filter(p => p.unit_id === u.id);
+    const unitMemberIds = new Set(MEMBERS.filter(m => m.unit_id === u.id).map(m => m.id));
+    const unassigned = MEMBERS.filter(m => m.unit_id === u.id && !m.squad_id);
+    return `
+      <div class="unitCard">
+        <input class="unitTitle" data-rename="${u.id}" value="${escapeHtml(u.name)}" />
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:6px">${MEMBERS.filter(m=>m.unit_id===u.id).length} فرد — ${unitPlatoons.length} فصيلة</div>
+
+        ${unitPlatoons.map(p => renderPlatoonBlock(p, u)).join("")}
+
+        <button class="smallBtn" data-addplatoon="${u.id}" style="margin-top:10px">+ إضافة فصيلة</button>
+
+        <div class="unassignedBox">
+          <div style="font-size:12px;color:#8A97A8;margin-bottom:8px">أفراد غير مصنّفين بفصيلة/مجموعة بعد</div>
+          ${unassigned.length === 0 ? `<div style="color:#5B6779;font-size:12px">لا يوجد</div>` : unassigned.map(m => `
+            <div class="smallMember">
+              <span>${escapeHtml(m.name)}</span>
+              <span style="display:flex;align-items:center;gap:6px">
+                <select data-assignsquad="${m.id}" style="font-size:11px;padding:3px 4px;margin:0">
+                  <option value="">أرسل لمجموعة...</option>
+                  ${unitPlatoons.flatMap(p => SQUADS.filter(s=>s.platoon_id===p.id).map(s => `<option value="${s.id}">${escapeHtml(p.name)} / ${escapeHtml(s.name)}</option>`)).join("")}
+                </select>
+                <span class="pinTag" data-showpin="${m.id}" data-pin="${m.pin}">••••</span>
+                <button class="xbtn" data-removemember="${m.id}">🗑️</button>
+              </span>
+            </div>
+          `).join("")}
+          <div class="addRow">
+            <input type="text" placeholder="اسم فرد جديد (غير مصنّف)" data-newname="${u.id}" />
+            <button data-addmember="${u.id}">إضافة</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPlatoonBlock(p, unit) {
+    const unitMembers = MEMBERS.filter(m => m.unit_id === unit.id);
+    const squads = SQUADS.filter(s => s.platoon_id === p.id);
+    const commander = MEMBERS.find(m => m.id === p.commander_member_id);
+    return `
+      <div class="platoonCard">
+        <div class="platoonHead">
+          <input class="unitTitle" data-renameplatoon="${p.id}" value="${escapeHtml(p.name)}" />
+          <button class="xbtn" data-delplatoon="${p.id}">🗑️</button>
+        </div>
+        <div class="cmdRow" style="flex-wrap:wrap">
+          🎖️ قائد فصيلة «${escapeHtml(p.name)}»:
+          ${commander ? `
+            <b style="color:#F0C94A">${escapeHtml(commander.name)}</b>
+            <button class="smallBtn" data-removeplatooncmd="${p.id}">إزالة</button>
+          ` : `
+            <input type="text" placeholder="اسم قائد الفصيلة" data-newplatooncmdname="${p.id}" style="flex:1;min-width:120px;margin:0;padding:5px 6px;font-size:12px" />
+            <button class="smallBtn" data-setplatooncmdnew="${p.id}" data-unitforplatooncmd="${unit.id}">تعيين</button>
+          `}
+        </div>
+        ${squads.map(s => renderSquadBlock(s, p, unit)).join("")}
+        <button class="smallBtn" data-addsquad="${p.id}">+ إضافة مجموعة</button>
+      </div>
+    `;
+  }
+
+  function renderSquadBlock(s, platoon, unit) {
+    const squadMembers = MEMBERS.filter(m => m.squad_id === s.id);
+    const commander = squadMembers.find(m => m.id === s.commander_member_id);
+    return `
+      <div class="squadCard">
+        <div class="squadHead">
+          <input class="unitTitle" data-renamesquad="${s.id}" value="${escapeHtml(s.name)}" />
+          <button class="xbtn" data-delsquad="${s.id}">🗑️</button>
+        </div>
+        <div class="cmdRow">
+          ⭐ قائد مجموعة «${escapeHtml(s.name)}»: ${commander ? `<b style="color:#F0C94A">${escapeHtml(commander.name)}</b>` : `<span style="color:#5B6779">— دوس ⭐ جنب اسم فرد بالأسفل لتعيينه —</span>`}
+        </div>
+        <div style="font-size:11px;color:#5B6779;margin-bottom:6px">${squadMembers.length} فرد</div>
+        ${squadMembers.map(m => `
+          <div class="smallMember">
+            <span>${escapeHtml(m.name)}${m.id===s.commander_member_id?" 🎖️":""}</span>
+            <span style="display:flex;align-items:center;gap:6px">
+              <button class="xbtn" title="${m.id===s.commander_member_id?'إلغاء تعيينه قائدًا':'تعيين قائد المجموعة'}" data-togglesquadcmd="${s.id}" data-memberforcmd="${m.id}" style="color:${m.id===s.commander_member_id?'#F0C94A':'#5B6779'}">⭐</button>
+              <span class="pinTag" data-showpin="${m.id}" data-pin="${m.pin}">••••</span>
+              <button class="xbtn" title="إخراج من المجموعة" data-unassignsquad="${m.id}">↩️</button>
+              <button class="xbtn" data-removemember="${m.id}">🗑️</button>
+            </span>
+          </div>
+        `).join("")}
+        <div class="addRow">
+          <input type="text" placeholder="اسم فرد جديد بهاي المجموعة" data-newnamesquad="${s.id}" data-unitforsquad="${unit.id}" />
+          <button data-addmembersquad="${s.id}" data-unitforsquad2="${unit.id}">إضافة</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function wireRosterEvents(main) {
+    main.querySelectorAll("[data-rename]").forEach(i => i.addEventListener("change", async () => {
+      await sb.from("units").update({ name:i.value.trim() }).eq("id", i.getAttribute("data-rename"));
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-renameplatoon]").forEach(i => i.addEventListener("change", async () => {
+      await sb.from("platoons").update({ name:i.value.trim() }).eq("id", i.getAttribute("data-renameplatoon"));
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-renamesquad]").forEach(i => i.addEventListener("change", async () => {
+      await sb.from("squads").update({ name:i.value.trim() }).eq("id", i.getAttribute("data-renamesquad"));
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-showpin]").forEach(s => s.addEventListener("click", () => {
+      s.textContent = s.textContent === "••••" ? s.getAttribute("data-pin") : "••••";
+    }));
+    main.querySelectorAll("[data-removemember]").forEach(b => b.addEventListener("click", async () => {
+      await sb.from("members").delete().eq("id", b.getAttribute("data-removemember"));
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-addmember]").forEach(b => b.addEventListener("click", async () => {
+      const unitId = b.getAttribute("data-addmember");
+      const input = main.querySelector(`[data-newname="${unitId}"]`);
+      const name = input.value.trim(); if (!name) return;
+      await sb.from("members").insert({ unit_id:unitId, name, pin:genPin() });
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-newname]").forEach(i => i.addEventListener("keydown", e => {
+      if (e.key === "Enter") main.querySelector(`[data-addmember="${i.getAttribute("data-newname")}"]`).click();
+    }));
+    main.querySelectorAll("[data-addplatoon]").forEach(b => b.addEventListener("click", async () => {
+      const name = prompt("اسم الفصيلة الجديدة:", "الفصيلة");
+      if (!name) return;
+      await sb.from("platoons").insert({ unit_id: b.getAttribute("data-addplatoon"), name: name.trim() });
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-delplatoon]").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm("حذف الفصيلة وكل مجموعاتها؟ الأفراد رح يرجعوا غير مصنّفين.")) return;
+      await sb.from("platoons").delete().eq("id", b.getAttribute("data-delplatoon"));
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-addsquad]").forEach(b => b.addEventListener("click", async () => {
+      const name = prompt("اسم المجموعة الجديدة:", "المجموعة");
+      if (!name) return;
+      await sb.from("squads").insert({ platoon_id: b.getAttribute("data-addsquad"), name: name.trim() });
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-delsquad]").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm("حذف المجموعة؟ الأفراد رح يرجعوا غير مصنّفين.")) return;
+      await sb.from("squads").delete().eq("id", b.getAttribute("data-delsquad"));
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-setplatooncmdnew]").forEach(b => b.addEventListener("click", async () => {
+      const platoonId = b.getAttribute("data-setplatooncmdnew");
+      const unitId = b.getAttribute("data-unitforplatooncmd");
+      const input = main.querySelector(`[data-newplatooncmdname="${platoonId}"]`);
+      const name = input.value.trim(); if (!name) return;
+      const { data: newMember } = await sb.from("members").insert({ unit_id: unitId, name, pin: genPin() }).select().single();
+      await sb.from("platoons").update({ commander_member_id: newMember.id }).eq("id", platoonId);
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-newplatooncmdname]").forEach(i => i.addEventListener("keydown", e => {
+      if (e.key === "Enter") main.querySelector(`[data-setplatooncmdnew="${i.getAttribute("data-newplatooncmdname")}"]`).click();
+    }));
+    main.querySelectorAll("[data-removeplatooncmd]").forEach(b => b.addEventListener("click", async () => {
+      await sb.from("platoons").update({ commander_member_id: null }).eq("id", b.getAttribute("data-removeplatooncmd"));
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-togglesquadcmd]").forEach(b => b.addEventListener("click", async () => {
+      const squadId = b.getAttribute("data-togglesquadcmd");
+      const memberId = b.getAttribute("data-memberforcmd");
+      const squad = SQUADS.find(s => s.id === squadId);
+      const nextVal = squad.commander_member_id === memberId ? null : memberId;
+      await sb.from("squads").update({ commander_member_id: nextVal }).eq("id", squadId);
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-assignsquad]").forEach(sel => sel.addEventListener("change", async () => {
+      if (!sel.value) return;
+      await sb.from("members").update({ squad_id: sel.value }).eq("id", sel.getAttribute("data-assignsquad"));
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-unassignsquad]").forEach(b => b.addEventListener("click", async () => {
+      await sb.from("members").update({ squad_id: null }).eq("id", b.getAttribute("data-unassignsquad"));
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-addmembersquad]").forEach(b => b.addEventListener("click", async () => {
+      const squadId = b.getAttribute("data-addmembersquad");
+      const unitId = b.getAttribute("data-unitforsquad2");
+      const input = main.querySelector(`[data-newnamesquad="${squadId}"]`);
+      const name = input.value.trim(); if (!name) return;
+      await sb.from("members").insert({ unit_id:unitId, squad_id:squadId, name, pin:genPin() });
+      await rerenderRosterKeepScroll();
+    }));
+    main.querySelectorAll("[data-newnamesquad]").forEach(i => i.addEventListener("keydown", e => {
+      if (e.key === "Enter") main.querySelector(`[data-addmembersquad="${i.getAttribute("data-newnamesquad")}"]`).click();
+    }));
+  }
+
+
+  const dayShortAr = (iso) => ["أحد","إثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت"][new Date(iso+"T00:00:00").getDay()];
+  function getSundayWeekStart(dateISO) {
+    const d = new Date(dateISO + "T00:00:00");
+    d.setDate(d.getDate() - d.getDay());
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+
+  async function exportWeeklyExcelReport(weekStartISO) {
+    const weekEndISO = addDays(weekStartISO, 6);
+    const records = await loadAttendanceRange(weekStartISO, weekEndISO);
+    const byDateMember = {};
+    records.forEach(r => { (byDateMember[r.date] ||= {})[r.member_id] = r.status; });
+
+    const days = Array.from({length:7}, (_, i) => addDays(weekStartISO, i));
+    const header = ["الاسم", "السرية", "الفصيلة", "المجموعة", ...days.map(d => `${dayShortAr(d)} ${d.slice(5)}`), "أيام الحضور", "أيام الغياب", "نسبة الحضور %"];
+
+    const rows = MEMBERS.map(m => {
+      const unit = UNITS.find(u => u.id === m.unit_id);
+      const squad = SQUADS.find(s => s.id === m.squad_id);
+      const platoon = squad ? PLATOONS.find(p => p.id === squad.platoon_id) : null;
+      let presentCount = 0, absentCount = 0;
+      const dayCells = days.map(d => {
+        const st = byDateMember[d]?.[m.id];
+        if (st === "present") { presentCount++; return "حاضر"; }
+        if (st === "absent") { absentCount++; return "غايب"; }
+        if (st && REQUEST_TYPES.includes(st)) return STATUS[st].label;
+        return "—";
+      });
+      const pct = Math.round((presentCount/7)*100);
+      return [m.name, unit?.name||"", platoon?.name||"", squad?.name||"", ...dayCells, presentCount, absentCount, pct];
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws["!cols"] = [{wch:20},{wch:12},{wch:14},{wch:14}, ...days.map(()=>({wch:10})), {wch:12},{wch:12},{wch:12}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "التقرير الأسبوعي");
+    XLSX.writeFile(wb, `تقرير-الحضور-${weekStartISO}.xlsx`);
+  }
+
+
+  const REQ_STATUS_LABELS_BACKUP = { pending:"بانتظار الموافقة", approved:"مُوافَق عليه", rejected:"مرفوض" };
+  const fmtDT = (iso) => { if (!iso) return ""; try { return new Date(iso).toLocaleString("ar-EG"); } catch(e) { return iso; } };
+
+  async function renderBackupTab() {
+    const main = document.getElementById("main");
+    main.innerHTML = `
+      <div class="formCard">
+        <div style="font-weight:800;margin-bottom:8px">💾 نسخة احتياطية كاملة</div>
+        <div style="font-size:12.5px;color:#8A97A8;margin-bottom:14px;line-height:1.7">
+          بتصدّرلك ملف Excel واحد فيه كل بيانات النظام (الأفراد، الحضور، الطلبات، طلبات التبديل، المخالفات، الهيكل التنظيمي، الإعدادات) — كل جدول بشيت منفصل داخل نفس الملف.
+          احتفظ بالملف بمكان آمن (بريدك، درايف، أو جهازك) بشكل دوري.
+        </div>
+        <button id="backupExportBtn" style="width:100%">⬇️ تحميل النسخة الاحتياطية الآن</button>
+        <div id="backupStatus" style="font-size:12px;color:#8A97A8;margin-top:10px"></div>
+      </div>
+
+      <div class="formCard">
+        <div style="font-weight:800;margin-bottom:8px">🖨️ طباعة دوام اليوم</div>
+        <div style="font-size:12.5px;color:#8A97A8;margin-bottom:14px;line-height:1.7">
+          بتفتحلك ورقة جاهزة للطباعة فيها بس أفراد السرية المناوبة اليوم، مقسّمين حسب النوبة (صباحي/مسائي/ليلي) مع حالة حضور كل فرد. من نافذة الطباعة فيك تختار "حفظ كـ PDF".
+        </div>
+        <button class="ghost" id="printTodayBtn" style="width:100%">🖨️ فتح صفحة الطباعة</button>
+      </div>
+    `;
+    document.getElementById("backupExportBtn").onclick = async () => {
+      const btn = document.getElementById("backupExportBtn");
+      const statusEl = document.getElementById("backupStatus");
+      btn.disabled = true; btn.textContent = "...جارِ تجهيز الملف";
+      statusEl.textContent = "";
+      try {
+        await exportFullBackupExcel();
+        statusEl.style.color = "#2FAE60";
+        statusEl.textContent = "✔ تم تحميل النسخة الاحتياطية بنجاح.";
+      } catch (e) {
+        statusEl.style.color = "#D64545";
+        statusEl.textContent = "صار خطأ أثناء تجهيز النسخة الاحتياطية، جرب مرة ثانية.";
+      }
+      btn.disabled = false; btn.textContent = "⬇️ تحميل النسخة الاحتياطية الآن";
+    };
+
+    document.getElementById("printTodayBtn").onclick = () => { printTodayDutyRoster(); };
+  }
+
+  async function exportFullBackupExcel() {
+    const memberName = (id) => MEMBERS.find(m => m.id === id)?.name || "—";
+    const wb = XLSX.utils.book_new();
+
+    // 1. الأفراد
+    const membersRows = MEMBERS.map(m => {
+      const unit = UNITS.find(u => u.id === m.unit_id);
+      const squad = SQUADS.find(s => s.id === m.squad_id);
+      const platoon = squad ? PLATOONS.find(p => p.id === squad.platoon_id) : null;
+      return {
+        "الاسم": m.name,
+        "السرية": unit?.name || "",
+        "الفصيلة": platoon?.name || "—",
+        "المجموعة": squad?.name || "—",
+        "الرمز السري": m.pin,
+        "تاريخ الإضافة": m.created_at ? String(m.created_at).slice(0,10) : "",
+      };
+    });
+    const wsMembers = XLSX.utils.json_to_sheet(membersRows.length ? membersRows : [{"الاسم":""}]);
+    wsMembers["!cols"] = [{wch:20},{wch:14},{wch:14},{wch:14},{wch:10},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsMembers, "الأفراد");
+
+    // 2. الحضور (كل السجلات)
+    const { data: allAttendance } = await sb.from("attendance").select("*").order("date", { ascending:false });
+    const attRows = (allAttendance || []).map(r => ({
+      "الاسم": memberName(r.member_id),
+      "التاريخ": r.date,
+      "الحالة": STATUS[r.status]?.label || r.status || "",
+      "وقت الدخول": r.time_in || "",
+      "ضمن نطاق القاعدة": r.geo?.in_range === true ? "نعم" : (r.geo?.in_range === false ? "لا" : "—"),
+      "المسافة عن القاعدة (م)": r.geo?.distance_m != null ? Math.round(r.geo.distance_m) : "",
+      "آخر تحديث": fmtDT(r.updated_at),
+    }));
+    const wsAtt = XLSX.utils.json_to_sheet(attRows.length ? attRows : [{"الاسم":""}]);
+    wsAtt["!cols"] = [{wch:20},{wch:12},{wch:10},{wch:10},{wch:14},{wch:16},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, wsAtt, "الحضور");
+
+    // 3. الطلبات (عذر/مرض/سفر/إجازة)
+    const { data: allRequests } = await sb.from("requests").select("*").order("created_at", { ascending:false });
+    const reqRows = (allRequests || []).map(r => ({
+      "الاسم": memberName(r.member_id),
+      "النوع": STATUS[r.type]?.label || r.type || "",
+      "التاريخ": r.date,
+      "ملاحظة": r.note || "",
+      "الحالة": REQ_STATUS_LABELS_BACKUP[r.status] || r.status || "",
+      "تاريخ الإرسال": fmtDT(r.created_at),
+      "تاريخ القرار": fmtDT(r.decided_at),
+    }));
+    const wsReq = XLSX.utils.json_to_sheet(reqRows.length ? reqRows : [{"الاسم":""}]);
+    wsReq["!cols"] = [{wch:20},{wch:10},{wch:12},{wch:24},{wch:16},{wch:18},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, wsReq, "الطلبات");
+
+    // 4. طلبات التبديل
+    const { data: allSwaps } = await sb.from("swap_requests").select("*").order("created_at", { ascending:false });
+    const swapRows = (allSwaps || []).map(sr => ({
+      "مقدّم الطلب": memberName(sr.requester_id),
+      "الطرف الثاني": memberName(sr.partner_id),
+      "تاريخ التبديل": sr.swap_date,
+      "ملاحظة": sr.note || "",
+      "الحالة": REQ_STATUS_LABELS_BACKUP[sr.status] || sr.status || "",
+      "تاريخ الإرسال": fmtDT(sr.created_at),
+      "تاريخ القرار": fmtDT(sr.decided_at),
+    }));
+    const wsSwap = XLSX.utils.json_to_sheet(swapRows.length ? swapRows : [{"مقدّم الطلب":""}]);
+    wsSwap["!cols"] = [{wch:20},{wch:20},{wch:12},{wch:24},{wch:16},{wch:18},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, wsSwap, "طلبات التبديل");
+
+    // 5. المخالفات (قد يكون الجدول فاضي أو غير مستخدم بعد)
+    let violationRows = [];
+    try {
+      const { data: allViolations } = await sb.from("violations").select("*").order("date", { ascending:false });
+      violationRows = (allViolations || []).map(v => ({
+        "الاسم": memberName(v.member_id),
+        "التاريخ": v.date,
+        "الوصف": v.description || "",
+        "العقوبة": v.penalty || "",
+        "الحالة": v.status || "",
+        "تاريخ التسجيل": fmtDT(v.created_at),
+      }));
+    } catch (e) { /* الجدول ممكن يكون غير متاح بعد */ }
+    const wsViol = XLSX.utils.json_to_sheet(violationRows.length ? violationRows : [{"الاسم":""}]);
+    wsViol["!cols"] = [{wch:20},{wch:12},{wch:26},{wch:20},{wch:12},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, wsViol, "المخالفات");
+
+    // 6. الهيكل التنظيمي
+    const structRows = [];
+    UNITS.forEach(u => {
+      const unitPlatoons = PLATOONS.filter(p => p.unit_id === u.id);
+      if (unitPlatoons.length === 0) {
+        structRows.push({ "السرية": u.name, "الفصيلة": "—", "قائد الفصيلة": "—", "المجموعة": "—", "قائد المجموعة": "—", "عدد الأفراد": MEMBERS.filter(m=>m.unit_id===u.id).length });
+      }
+      unitPlatoons.forEach(p => {
+        const platoonSquads = SQUADS.filter(s => s.platoon_id === p.id);
+        const platoonCmd = memberName(p.commander_member_id);
+        if (platoonSquads.length === 0) {
+          structRows.push({ "السرية": u.name, "الفصيلة": p.name, "قائد الفصيلة": p.commander_member_id ? platoonCmd : "—", "المجموعة": "—", "قائد المجموعة": "—", "عدد الأفراد": 0 });
+        }
+        platoonSquads.forEach(s => {
+          const squadMembers = MEMBERS.filter(m => m.squad_id === s.id);
+          structRows.push({
+            "السرية": u.name, "الفصيلة": p.name,
+            "قائد الفصيلة": p.commander_member_id ? platoonCmd : "—",
+            "المجموعة": s.name,
+            "قائد المجموعة": s.commander_member_id ? memberName(s.commander_member_id) : "—",
+            "عدد الأفراد": squadMembers.length,
+          });
+        });
+      });
+    });
+    const wsStruct = XLSX.utils.json_to_sheet(structRows.length ? structRows : [{"السرية":""}]);
+    wsStruct["!cols"] = [{wch:16},{wch:16},{wch:18},{wch:16},{wch:18},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsStruct, "الهيكل التنظيمي");
+
+    // 7. الإعدادات
+    const settingsRows = [
+      { "الإعداد": "دورة المناوبة (rotation)", "القيمة": ROTATION ? JSON.stringify(ROTATION) : "" },
+      { "الإعداد": "موقع القاعدة (base_location)", "القيمة": BASE_LOCATION ? JSON.stringify(BASE_LOCATION) : "" },
+    ];
+    const wsSettings = XLSX.utils.json_to_sheet(settingsRows);
+    wsSettings["!cols"] = [{wch:26},{wch:50}];
+    XLSX.utils.book_append_sheet(wb, wsSettings, "الإعدادات");
+
+    const stamp = todayISO();
+    XLSX.writeFile(wb, `نسخة-احتياطية-كاملة-${stamp}.xlsx`);
+  }
+
+  async function printTodayDutyRoster() {
+    const dateISO = todayISO();
+    const records = await loadAttendance(dateISO);
+    const recByMember = {};
+    records.forEach(r => recByMember[r.member_id] = r);
+    const onDutyUnitId = getOnDutyUnitId(UNITS, ROTATION, dateISO);
+    const onDutyUnit = UNITS.find(u => u.id === onDutyUnitId) || UNITS[0];
+    const weekStart = getWeekStart(dateISO, ROTATION);
+    const planRows = await loadShiftPlan(weekStart);
+    const onDutyPlatoons = PLATOONS.filter(p => p.unit_id === onDutyUnitId);
+
+    function membersOfPlatoon(platoonId) {
+      const squadIds = SQUADS.filter(s => s.platoon_id === platoonId).map(s => s.id);
+      return MEMBERS.filter(m => squadIds.includes(m.squad_id));
+    }
+
+    const shiftSections = SHIFTS.map(shift => {
+      const platoonIds = planRows.filter(r => r.shift === shift.id && onDutyPlatoons.some(p => p.id === r.platoon_id)).map(r => r.platoon_id);
+      const platoonNames = platoonIds.map(pid => onDutyPlatoons.find(p => p.id === pid)?.name).filter(Boolean);
+      const mems = platoonIds.flatMap(pid => membersOfPlatoon(pid));
+      return { shift, platoonNames, members: mems };
+    });
+
+    const coveredIds = new Set(shiftSections.flatMap(s => s.members.map(m => m.id)));
+    const allUnitMembers = MEMBERS.filter(m => m.unit_id === onDutyUnitId);
+    const leftover = allUnitMembers.filter(m => !coveredIds.has(m.id));
+
+    const rowsHtml = (mems) => mems.length === 0
+      ? `<tr><td colspan="5" style="text-align:center;color:#888;padding:10px">لا يوجد أفراد</td></tr>`
+      : mems.map((m, i) => {
+          const rec = recByMember[m.id];
+          const squad = SQUADS.find(s => s.id === m.squad_id);
+          const statusLabel = rec ? (STATUS[rec.status]?.label || rec.status) : "لم يُحدد بعد";
+          return `<tr>
+            <td>${i + 1}</td>
+            <td>${escapeHtml(m.name)}</td>
+            <td>${escapeHtml(squad?.name || "—")}</td>
+            <td>${escapeHtml(statusLabel)}</td>
+            <td>${escapeHtml(rec?.time_in || "—")}</td>
+          </tr>`;
+        }).join("");
+
+    const sectionsHtml = shiftSections.map(sec => `
+      <div class="section">
+        <div class="secHead">
+          <span>${escapeHtml(sec.shift.label)} (${escapeHtml(sec.shift.range)})</span>
+          <span class="secPlatoons">${sec.platoonNames.length ? "الفصيلة: " + sec.platoonNames.map(escapeHtml).join("، ") : "بدون فصيلة معيّنة"}</span>
+        </div>
+        <table>
+          <thead><tr><th>#</th><th>الاسم</th><th>المجموعة</th><th>الحالة</th><th>وقت الدخول</th></tr></thead>
+          <tbody>${rowsHtml(sec.members)}</tbody>
+        </table>
+      </div>
+    `).join("");
+
+    const leftoverHtml = leftover.length ? `
+      <div class="section">
+        <div class="secHead"><span>أفراد غير مغطّين بأي نوبة اليوم</span></div>
+        <table>
+          <thead><tr><th>#</th><th>الاسم</th></tr></thead>
+          <tbody>${leftover.map((m, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(m.name)}</td></tr>`).join("")}</tbody>
+        </table>
+      </div>` : "";
+
+    const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+      <title>دوام اليوم — ${dateISO}</title>
+      <style>
+        body { font-family: Tahoma, Arial, sans-serif; padding: 24px; color:#111; }
+        h1 { font-size:20px; margin:0 0 2px; }
+        .sub { color:#555; font-size:13px; margin-bottom:18px; }
+        .section { margin-bottom:22px; page-break-inside: avoid; }
+        .secHead { display:flex; justify-content:space-between; font-weight:bold; font-size:14px; border-bottom:2px solid #333; padding-bottom:6px; margin-bottom:6px; }
+        .secPlatoons { font-weight:normal; font-size:12px; color:#555; }
+        table { width:100%; border-collapse:collapse; font-size:12.5px; }
+        th, td { border:1px solid #ccc; padding:6px 8px; text-align:right; }
+        th { background:#eee; }
+        .footer { margin-top:30px; font-size:11px; color:#777; text-align:center; }
+        @media print { body { padding:8px; } }
+      </style></head>
+      <body>
+        <h1>سجلّ الدوام — دوام اليوم</h1>
+        <div class="sub">${escapeHtml(dayNameAr(dateISO))} — ${escapeHtml(monthNameAr(dateISO))} &nbsp;|&nbsp; السرية المناوبة: ${escapeHtml(onDutyUnit?.name || "")}</div>
+        ${sectionsHtml}
+        ${leftoverHtml}
+        <div class="footer">تم توليد هذا التقرير آليًا من نظام سجلّ الدوام</div>
+      </body></html>`;
+
+    const w = window.open("", "_blank");
+    if (!w) { alert("الرجاء السماح بفتح نافذة منبثقة (Pop-up) لطباعة التقرير"); return; }
+    w.document.write(html);
+    w.document.close();
+    w.onload = () => { w.focus(); w.print(); };
+  }
+
+  async function renderDashboard() {
+    const main = document.getElementById("main");
+    main.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
+
+    const today = todayISO();
+    const onDutyUnitId = getOnDutyUnitId(UNITS, ROTATION, today);
+    const onDutyUnit = UNITS.find(u => u.id === onDutyUnitId) || UNITS[0];
+    const weekStart = getWeekStart(today, ROTATION);
+    const planRows = await loadShiftPlan(weekStart);
+    const records = await loadAttendance(today);
+    const allRequests = await loadRequests();
+    const recByMember = {};
+    records.forEach(r => recByMember[r.member_id] = r);
+
+    const onDutyPlatoons = PLATOONS.filter(p => p.unit_id === onDutyUnitId);
+    function membersOfPlatoon(platoonId) {
+      const squadIds = SQUADS.filter(s => s.platoon_id === platoonId).map(s => s.id);
+      return MEMBERS.filter(m => squadIds.includes(m.squad_id));
+    }
+
+    let totalCovered = 0, totalPresent = 0, totalLeave = 0, totalAbsent = 0, totalPending = 0;
+    const pendingMembers = [];
+    const platoonStats = onDutyPlatoons.map(p => {
+      const planned = planRows.find(r => r.platoon_id === p.id)?.shift;
+      const mems = planned ? membersOfPlatoon(p.id) : [];
+      let present = 0, leave = 0, absent = 0, pending = 0;
+      mems.forEach(m => {
+        const st = recByMember[m.id]?.status;
+        if (st === "present") present++;
+        else if (st === "absent") absent++;
+        else if (REQUEST_TYPES.includes(st)) leave++;
+        else { pending++; pendingMembers.push(m.name); }
+      });
+      totalCovered += mems.length; totalPresent += present; totalLeave += leave; totalAbsent += absent; totalPending += pending;
+      return { name: p.name, planned, total: mems.length, present, leave, absent, pending };
+    });
+
+    const pendingRequestsCount = allRequests.filter(r => r.status === "pending").length;
+    const attendancePct = totalCovered > 0 ? Math.round((totalPresent / totalCovered) * 100) : 0;
+    const currentBroadcast = await getEmergencyBroadcast();
+
+    main.innerHTML = `
+      <div class="dutyBanner">
+        <div><div class="dutyLabel">${dayNameAr(today)} — ${monthNameAr(today)}</div><div class="dutyUnit">${escapeHtml(onDutyUnit?.name||"")} مناوبة اليوم</div></div>
+        <div style="text-align:left"><div style="font-size:26px;font-weight:800;color:${attendancePct>=80?'#2FAE60':attendancePct>=50?'#D89A2E':'#D64545'}">${attendancePct}%</div><div style="font-size:11px;color:#8A97A8">نسبة الحضور</div></div>
+      </div>
+
+      <div class="formCard" style="border:1px solid #D64545">
+        <div style="font-weight:800;margin-bottom:6px;color:#D64545">🚨 رسالة طارئة</div>
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">بتوصل فورًا لكل أفراد ${escapeHtml(onDutyUnit?.name||"السرية المناوبة")} لما يفتحوا التطبيق على أجهزتهم.</div>
+        <textarea id="emergencyMsgInput" rows="2" placeholder="اكتب الرسالة هون..." style="width:100%"></textarea>
+        <button id="sendEmergencyBtn" style="width:100%;margin-top:8px;background:#D64545;border-color:#D64545">🚨 إرسال الآن لكل المناوبين</button>
+        <div id="emergencyStatus" style="font-size:12px;margin-top:8px"></div>
+        ${currentBroadcast && currentBroadcast.message ? `
+          <div style="margin-top:10px;padding:8px;border:1px solid #3A4658;border-radius:8px;font-size:12px">
+            <div style="color:#8A97A8;margin-bottom:4px">آخر رسالة مُرسلة (${new Date(currentBroadcast.sent_at).toLocaleString("ar-EG")}):</div>
+            <div style="margin-bottom:6px">${escapeHtml(currentBroadcast.message)}</div>
+            <button class="ghost" id="clearEmergencyBtn" style="font-size:11px;padding:4px 8px">إلغاء التنبيه الحالي</button>
+          </div>
+        ` : ""}
+      </div>
+
+      <div class="rosterGrid" style="grid-template-columns:repeat(2,1fr);gap:10px">
+        <div class="formCard" style="text-align:center">
+          <div style="font-size:24px;font-weight:800;color:#2FAE60">${totalPresent}</div>
+          <div style="font-size:12px;color:#8A97A8">حاضر</div>
+        </div>
+        <div class="formCard" style="text-align:center">
+          <div style="font-size:24px;font-weight:800;color:#D64545">${totalAbsent}</div>
+          <div style="font-size:12px;color:#8A97A8">غايب</div>
+        </div>
+        <div class="formCard" style="text-align:center">
+          <div style="font-size:24px;font-weight:800;color:#3B82C4">${totalLeave}</div>
+          <div style="font-size:12px;color:#8A97A8">إجازة/عذر/سفر/مرض</div>
+        </div>
+        <div class="formCard" style="text-align:center">
+          <div style="font-size:24px;font-weight:800;color:#D89A2E">${totalPending}</div>
+          <div style="font-size:12px;color:#8A97A8">لسا ما أكدوا</div>
+        </div>
+      </div>
+
+      <div class="formCard">
+        <div style="font-weight:800;margin-bottom:8px">📥 التقرير الأسبوعي (Excel)</div>
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:8px">اختر أي يوم من الأسبوع المطلوب — التقرير بياخد الأسبوع كامل (من الأحد لحد السبت)</div>
+        <input type="date" id="reportWeekDate" value="${today}" style="margin-bottom:10px" />
+        <button id="exportWeekBtn" style="width:100%">تنزيل تقرير الأسبوع (Excel)</button>
+      </div>
+
+      <div class="formCard" style="cursor:pointer" id="goRequestsCard">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:800;font-size:13px">📨 طلبات بانتظار الموافقة</div>
+            <div style="font-size:12px;color:#8A97A8">دوس لتفتح تبويب الطلبات مباشرة</div>
+          </div>
+          <div style="font-size:22px;font-weight:800;color:${pendingRequestsCount>0?'#D89A2E':'#8A97A8'}">${pendingRequestsCount}</div>
+        </div>
+      </div>
+
+      <div class="planBox">
+        <div style="font-weight:800;margin-bottom:10px">📊 الحضور حسب الفصيلة (${escapeHtml(onDutyUnit?.name||"")})</div>
+        ${platoonStats.length === 0 ? `<div class="empty">ما في فصائل بعد</div>` : platoonStats.map(p => {
+          const pct = p.total > 0 ? Math.round((p.present/p.total)*100) : 0;
+          return `
+            <div style="margin-bottom:12px">
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+                <span>${escapeHtml(p.name)}${!p.planned ? ` <span style="color:#5B6779;font-size:11px">(بدون نوبة اليوم)</span>` : ""}</span>
+                <span style="color:#8A97A8">${p.present}/${p.total}</span>
+              </div>
+              <div style="height:8px;background:#1E2B41;border-radius:4px;overflow:hidden">
+                <div style="height:100%;width:${pct}%;background:${pct>=80?'#2FAE60':pct>=50?'#D89A2E':'#D64545'}"></div>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+
+      ${pendingMembers.length > 0 ? `
+        <div class="leftoverBox">
+          <div style="font-size:12px;color:#8A97A8;margin-bottom:8px">⏳ لسا ما أكدوا حضورهم اليوم (${pendingMembers.length}):</div>
+          ${pendingMembers.map(n => `<span style="display:inline-block;background:#141F2E;border:1px solid #2A3547;border-radius:8px;padding:4px 8px;margin:3px;font-size:12px">${escapeHtml(n)}</span>`).join("")}
+        </div>
+      ` : ""}
+    `;
+
+    const goReq = document.getElementById("goRequestsCard");
+    if (goReq) goReq.onclick = () => { currentTab = "requests"; render(); };
+
+    const exportBtn = document.getElementById("exportWeekBtn");
+    if (exportBtn) exportBtn.onclick = async () => {
+      exportBtn.disabled = true; exportBtn.textContent = "...جارِ التجهيز";
+      const chosen = document.getElementById("reportWeekDate").value || today;
+      const weekStart = getSundayWeekStart(chosen);
+      await exportWeeklyExcelReport(weekStart);
+      exportBtn.disabled = false; exportBtn.textContent = "تنزيل تقرير الأسبوع (Excel)";
+    };
+
+    const sendEmergencyBtn = document.getElementById("sendEmergencyBtn");
+    if (sendEmergencyBtn) sendEmergencyBtn.onclick = async () => {
+      const input = document.getElementById("emergencyMsgInput");
+      const statusEl = document.getElementById("emergencyStatus");
+      const msg = input.value.trim();
+      if (!msg) { statusEl.style.color = "#D64545"; statusEl.textContent = "لازم تكتب نص الرسالة أول."; return; }
+      sendEmergencyBtn.disabled = true; sendEmergencyBtn.textContent = "...جارِ الإرسال";
+      try {
+        await setEmergencyBroadcast(msg);
+        statusEl.style.color = "#2FAE60";
+        statusEl.textContent = "✔ انبعثت الرسالة، بتظهر لكل مناوب لما يفتح التطبيق.";
+        input.value = "";
+        renderDashboard();
+        sb.auth.getSession().then(({ data: { session } }) => {
+          if (!session) return;
+          fetch(`${SUPABASE_URL}/functions/v1/send-emergency-push`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+            body: JSON.stringify({ message: msg }),
+          }).catch(() => { /* الإشعار الفوري فشل، بس الرسالة صارت متوفرة بالتطبيق برضو */ });
+        });
+      } catch (e) {
+        statusEl.style.color = "#D64545";
+        statusEl.textContent = "صار خطأ أثناء الإرسال، جرب مرة ثانية.";
+        sendEmergencyBtn.disabled = false; sendEmergencyBtn.textContent = "🚨 إرسال الآن لكل المناوبين";
+      }
+    };
+
+    const clearEmergencyBtn = document.getElementById("clearEmergencyBtn");
+    if (clearEmergencyBtn) clearEmergencyBtn.onclick = async () => {
+      clearEmergencyBtn.disabled = true; clearEmergencyBtn.textContent = "...";
+      try {
+        await clearEmergencyBroadcast();
+        renderDashboard();
+      } catch (e) {
+        clearEmergencyBtn.disabled = false; clearEmergencyBtn.textContent = "إلغاء التنبيه الحالي";
+        alert("ما قدرنا نلغي التنبيه، جرب مرة ثانية.");
+      }
+    };
+  }
+
+  // ---------- Duty ----------
+  async function loadAttendance(dateISO) {
+    const { data } = await sb.from("attendance").select("*").eq("date", dateISO);
+    return data || [];
+  }
+  async function loadAttendanceRange(startISO, endISO) {
+    const { data } = await sb.from("attendance").select("*").gte("date", startISO).lte("date", endISO);
+    return data || [];
+  }
+  async function upsertAttendance(memberId, dateISO, patch) {
+    const { data: existing } = await sb.from("attendance").select("*").eq("member_id", memberId).eq("date", dateISO).maybeSingle();
+    if (existing) {
+      await sb.from("attendance").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", existing.id);
+    } else {
+      await sb.from("attendance").insert({ member_id: memberId, date: dateISO, ...patch });
+    }
+  }
+
+  async function renderDuty() {
+    const main = document.getElementById("main");
+    main.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
+    const records = await loadAttendance(currentDate);
+    const onDutyUnitId = getOnDutyUnitId(UNITS, ROTATION, currentDate);
+    const onDutyUnit = UNITS.find(u => u.id === onDutyUnitId) || UNITS[0];
+    const offDutyUnit = UNITS.find(u => u.id !== onDutyUnitId) || UNITS[1];
+    const weekStart = getWeekStart(currentDate, ROTATION);
+    const planRows = await loadShiftPlan(weekStart);
+    const onDutyPlatoons = PLATOONS.filter(p => p.unit_id === onDutyUnitId);
+    const recByMember = {};
+    records.forEach(r => recByMember[r.member_id] = r);
+    const now = new Date();
+    const isToday = currentDate === todayISO();
+
+    function membersOfPlatoon(platoonId) {
+      const squadIds = SQUADS.filter(s => s.platoon_id === platoonId).map(s => s.id);
+      return MEMBERS.filter(m => squadIds.includes(m.squad_id));
+    }
+
+    const coveredMemberIds = new Set();
+    const shiftMembersMap = {};
+    SHIFTS.forEach(shift => {
+      const platoonIds = planRows.filter(r => r.shift === shift.id && onDutyPlatoons.some(p => p.id === r.platoon_id)).map(r => r.platoon_id);
+      const mems = platoonIds.flatMap(pid => membersOfPlatoon(pid));
+      shiftMembersMap[shift.id] = mems;
+      mems.forEach(m => coveredMemberIds.add(m.id));
+    });
+
+    const allUnitMembers = MEMBERS.filter(m => m.unit_id === onDutyUnitId);
+    const leftover = allUnitMembers.filter(m => !coveredMemberIds.has(m.id));
+
+    main.innerHTML = `
+      <div class="dateBar">
+        <button class="iconbtn" data-prevday>›</button>
+        <div style="text-align:center">
+          <div class="dateMain">${dayNameAr(currentDate)} — ${monthNameAr(currentDate)}</div>
+          ${!isToday ? `<button class="linkbtn" data-today>العودة لليوم</button>` : ""}
+        </div>
+        <button class="iconbtn" data-nextday>‹</button>
+      </div>
+      <div class="dutyBanner">
+        <div><div class="dutyLabel">السرية المناوبة هذا الأسبوع</div><div class="dutyUnit">${escapeHtml(onDutyUnit?.name||"")}</div></div>
+        <div style="text-align:left"><div style="font-size:12px;color:#8A97A8">مستريحة</div><div style="font-size:13px;color:#8A97A8">${escapeHtml(offDutyUnit?.name||"")}</div></div>
+      </div>
+
+      <div class="formCard" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:800;font-size:13px">📍 موقع القاعدة</div>
+          <div style="font-size:12px;color:#8A97A8">${BASE_LOCATION ? `نطاق القبول: ${BASE_LOCATION.radius} متر — التحقق من الموقع مفعّل` : "ما تحدد بعد — التحقق من الموقع غير مفعّل حاليًا"}</div>
+        </div>
+        <button class="smallBtn" id="setBaseLocBtn">${BASE_LOCATION ? "تعديل الموقع" : "تحديد من الخريطة"}</button>
+      </div>
+
+      <div class="planBox">
+        <div style="font-weight:800;margin-bottom:8px">🗓️ خطة نوبات الأسبوع (من ${monthNameAr(weekStart)})</div>
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:10px">حدد أي فصيلة تاخد أي نوبة — بينطبق تلقائيًا على كل أيام هالأسبوع لهاي السرية.</div>
+        ${onDutyPlatoons.length === 0 ? `<div class="empty">ما عندك فصائل بـ${escapeHtml(onDutyUnit?.name||"")} بعد — أضفها من تبويب «الطاقم».</div>` : onDutyPlatoons.map(p => {
+          const current = planRows.find(r => r.platoon_id === p.id)?.shift || "";
+          return `
+            <div class="planRow">
+              <span>${escapeHtml(p.name)}</span>
+              <select data-planshift="${p.id}">
+                <option value="">— بدون نوبة (راحة) —</option>
+                ${SHIFTS.map(s => `<option value="${s.id}" ${current===s.id?"selected":""}>${s.label} (${s.range})</option>`).join("")}
+              </select>
+            </div>
+          `;
+        }).join("")}
+      </div>
+
+      ${allUnitMembers.length === 0 ? `<div class="empty">لا يوجد أفراد بـ${escapeHtml(onDutyUnit?.name||"")} بعد — أضفهم من تبويب «الطاقم».</div>` : ""}
+      <div class="shiftGrid">
+        ${SHIFTS.map(shift => {
+          const shiftMembers = shiftMembersMap[shift.id];
+          const platoonNames = planRows.filter(r => r.shift===shift.id && onDutyPlatoons.some(p=>p.id===r.platoon_id)).map(r => onDutyPlatoons.find(p=>p.id===r.platoon_id)?.name).filter(Boolean);
+          return `
+            <div class="shiftCard">
+              <div class="shiftHeader" style="color:${shift.color}"><span>${shift.label}</span><span style="font-size:12px;color:#8A97A8">${shift.range}</span></div>
+              ${platoonNames.length>0 ? `<div style="font-size:11px;color:#8A97A8;margin-bottom:8px">الفصيلة: ${platoonNames.map(escapeHtml).join("، ")}</div>` : `<div style="font-size:11px;color:#5B6779;margin-bottom:8px">ما في فصيلة معيّنة لهاي النوبة هالأسبوع</div>`}
+              ${shiftMembers.length===0 ? `<div style="color:#5B6779;font-size:12px;padding:6px 0">لا يوجد أفراد</div>` : ""}
+              ${shiftMembers.map(m => renderMemberRow(m, recByMember[m.id], shift, now, isToday)).join("")}
+            </div>
+          `;
+        }).join("")}
+      </div>
+
+      ${leftover.length>0 ? `
+        <div class="leftoverBox">
+          <div style="font-size:12px;color:#8A97A8;margin-bottom:8px">⚠️ أفراد من ${escapeHtml(onDutyUnit?.name||"")} مش مغطّين بأي نوبة هالأسبوع (إما مش بفصيلة/مجموعة، أو فصيلتهم ما إلها نوبة معيّنة):</div>
+          ${leftover.map(m => `<span style="display:inline-block;background:#141F2E;border:1px solid #2A3547;border-radius:8px;padding:4px 8px;margin:3px;font-size:12px">${escapeHtml(m.name)}</span>`).join("")}
+        </div>
+      ` : ""}
+    `;
+
+    document.querySelector("[data-prevday]").onclick = () => { currentDate = addDays(currentDate, -1); renderDuty(); };
+    document.querySelector("[data-nextday]").onclick = () => { currentDate = addDays(currentDate, 1); renderDuty(); };
+    const todayBtn = document.querySelector("[data-today]");
+    if (todayBtn) todayBtn.onclick = () => { currentDate = todayISO(); renderDuty(); };
+
+    main.querySelectorAll("[data-planshift]").forEach(sel => sel.addEventListener("change", async () => {
+      await setPlatoonShift(sel.getAttribute("data-planshift"), weekStart, sel.value);
+      renderDuty();
+    }));
+
+    main.querySelectorAll("[data-status]").forEach(btn => btn.addEventListener("click", async () => {
+      const memberId = btn.getAttribute("data-memberid");
+      const status = btn.getAttribute("data-status");
+      if (status === "present") { openVerify(memberId); return; }
+      await upsertAttendance(memberId, currentDate, { status, verified:false, geo:null, time_in:null });
+      renderDuty();
+    }));
+    main.querySelectorAll("[data-timein]").forEach(inp => inp.addEventListener("change", async () => {
+      await upsertAttendance(inp.getAttribute("data-timein"), currentDate, { time_in: inp.value });
+      renderDuty();
+    }));
+    main.querySelectorAll("[data-startverify]").forEach(btn => btn.addEventListener("click", () => openVerify(btn.getAttribute("data-startverify"))));
+
+    const setBaseBtn = document.getElementById("setBaseLocBtn");
+    if (setBaseBtn) setBaseBtn.onclick = () => openBaseLocationPicker();
+  }
+
+  function renderMemberRow(member, rec, shift, now, isToday) {
+    const status = rec?.status;
+    let progressHtml = "";
+    if (status === "present" && rec?.time_in && isToday) {
+      const [h,m] = rec.time_in.split(":").map(Number);
+      const start = new Date(now); start.setHours(h,m,0,0);
+      const elapsed = now - start; const total = 8*3600*1000;
+      const pct = Math.max(0, Math.min(1, elapsed/total));
+      const done = elapsed >= total;
+      const doneAt = new Date(start.getTime()+total);
+      progressHtml = `
+        <div style="margin-top:6px">
+          <div style="height:6px;background:#1E2B41;border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${pct*100}%;background:${done?'#2FAE60':shift.color}"></div>
+          </div>
+          <div style="font-size:11px;color:${done?'#2FAE60':'#8A97A8'};margin-top:3px">
+            ${done ? "أنهى النوبة ✅ (٨ ساعات)" : `قيد النوبة — تنتهي حوالي ${pad(doneAt.getHours())}:${pad(doneAt.getMinutes())}`}
+          </div>
+        </div>`;
+    }
+    let geoHtml = "";
+    if (status === "present" && rec?.geo) {
+      const g = rec.geo;
+      let rangeHtml = "";
+      if (typeof g.in_range === "boolean") {
+        rangeHtml = g.in_range
+          ? `<div style="font-size:11px;color:#2FAE60;margin-top:2px">✔ داخل نطاق القاعدة</div>`
+          : `<div style="font-size:11px;color:#D64545;margin-top:2px">⚠️ خارج نطاق القاعدة (تقريبًا <span class="mono">${g.distance_m}</span> م)</div>`;
+      }
+      geoHtml = `<a class="geoLink" href="https://www.google.com/maps?q=${g.lat},${g.lng}" target="_blank">📍 موقع الحضور على الخريطة (دقة ~${g.accuracy} م)</a>${rangeHtml}`;
+    } else if (status === "present" && rec?.verified) {
+      geoHtml = `<div class="geoNote">لم يتم تحديد الموقع (رفض الإذن أو غير متاح)</div>`;
+    }
+    return `
+      <div class="memberRow" id="row-${member.id}">
+        <div class="memberRowTop">
+          <span>${escapeHtml(member.name)}</span>
+        </div>
+        <div class="pillsRow">
+          <button class="pill ${status==='present'?'active':''}" data-status="present" data-memberid="${member.id}" style="border-color:${STATUS.present.color};color:${status==='present'?'#0F1720':STATUS.present.color};${status==='present'?`background:${STATUS.present.color}`:''}">حاضر</button>
+          ${Object.entries(STATUS).filter(([k])=>k!=='present').map(([k,s]) => `
+            <button class="pill ${status===k?'active':''}" data-status="${k}" data-memberid="${member.id}" style="border-color:${s.color};color:${status===k?'#0F1720':s.color};${status===k?`background:${s.color}`:''}">${s.label}</button>
+          `).join("")}
+        </div>
+        <div id="verifyHolder-${member.id}"></div>
+        ${status === "present" ? `
+          <div class="timeRow">
+            🕐 وقت الحضور
+            <input type="time" value="${rec.time_in||''}" data-timein="${member.id}" />
+            ${rec.verified ? `<span style="color:#2FAE60">✔ مؤكد بالرمز</span>` : ""}
+          </div>
+          ${geoHtml}
+          ${progressHtml}
+        ` : ""}
+      </div>
+    `;
+  }
+
+  function openVerify(memberId) {
+    const holder = document.getElementById(`verifyHolder-${memberId}`);
+    if (!holder) return;
+    holder.innerHTML = `
+      <div class="verifyBox">
+        🔑
+        <input type="password" inputmode="numeric" placeholder="رمز الفرد" id="pinInput-${memberId}" />
+        <button class="miniBtn" id="pinConfirm-${memberId}">تأكيد</button>
+        <button class="miniBtnGhost" id="pinCancel-${memberId}">إلغاء</button>
+      </div>
+    `;
+    document.getElementById(`pinCancel-${memberId}`).onclick = () => { holder.innerHTML = ""; };
+    document.getElementById(`pinConfirm-${memberId}`).onclick = async () => {
+      const val = document.getElementById(`pinInput-${memberId}`).value;
+      const member = MEMBERS.find(m => m.id === memberId);
+      if (val !== member.pin) {
+        document.getElementById(`pinInput-${memberId}`).style.borderColor = "#D64545";
+        return;
+      }
+      const btn = document.getElementById(`pinConfirm-${memberId}`);
+      btn.disabled = true; btn.textContent = "...جارِ تحديد الموقع";
+      const geo = await getGeo();
+      if (geo && BASE_LOCATION) {
+        const dist = haversineDistanceMeters(geo.lat, geo.lng, BASE_LOCATION.lat, BASE_LOCATION.lng);
+        geo.distance_m = Math.round(dist);
+        geo.in_range = dist <= BASE_LOCATION.radius;
+      }
+      const now = new Date();
+      const hh = pad(now.getHours()), mm = pad(now.getMinutes());
+      await upsertAttendance(memberId, currentDate, { status:"present", verified:true, geo, time_in: hh+":"+mm });
+      renderDuty();
+    };
+  }
+
+  function openBaseLocationPicker() {
+    const overlay = document.createElement("div");
+    overlay.id = "mapModalOverlay";
+    overlay.style.cssText = "position:fixed;inset:0;background:#000000cc;z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px";
+    overlay.innerHTML = `
+      <div style="background:#141F2E;border:1px solid #1E2B41;border-radius:14px;padding:16px;max-width:480px;width:100%">
+        <div style="font-weight:800;margin-bottom:8px">📍 حدد موقع القاعدة</div>
+        <div style="font-size:12px;color:#8A97A8;margin-bottom:8px">دوس عالخريطة لتحديد نقطة القاعدة، أو استخدم موقعك الحالي إذا واقف فيها</div>
+        <div id="pickerMap" style="height:280px;border-radius:10px;overflow:hidden;margin-bottom:10px"></div>
+        <button class="smallBtn" id="useMyLocBtn" style="margin-bottom:10px">📌 استخدم موقعي الحالي</button>
+        <div style="font-size:12px;margin-bottom:6px">نصف قطر القبول: <b id="radiusVal">${BASE_LOCATION?.radius || 150}</b> متر</div>
+        <input type="range" id="radiusSlider" min="20" max="1000" step="10" value="${BASE_LOCATION?.radius || 150}" style="width:100%;margin-bottom:12px" />
+        <div style="display:flex;gap:8px">
+          <button id="saveBaseLocBtn" style="flex:1">حفظ</button>
+          <button class="ghost" id="cancelBaseLocBtn" style="flex:1">إلغاء</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const startLat = BASE_LOCATION?.lat ?? 33.8886;
+    const startLng = BASE_LOCATION?.lng ?? 35.4955;
+    const map = L.map("pickerMap").setView([startLat, startLng], BASE_LOCATION ? 16 : 8);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
+
+    let marker = null, circle = null;
+    let picked = BASE_LOCATION ? { lat: startLat, lng: startLng } : null;
+
+    function placeMarker(lat, lng) {
+      picked = { lat, lng };
+      const radius = +document.getElementById("radiusSlider").value;
+      if (marker) marker.setLatLng([lat, lng]); else marker = L.marker([lat, lng]).addTo(map);
+      if (circle) circle.setLatLng([lat, lng]).setRadius(radius); else circle = L.circle([lat, lng], { radius, color: "#D89A2E" }).addTo(map);
+    }
+    if (picked) placeMarker(picked.lat, picked.lng);
+
+    map.on("click", (e) => placeMarker(e.latlng.lat, e.latlng.lng));
+
+    document.getElementById("radiusSlider").oninput = (e) => {
+      document.getElementById("radiusVal").textContent = e.target.value;
+      if (circle) circle.setRadius(+e.target.value);
+    };
+
+    document.getElementById("useMyLocBtn").onclick = async () => {
+      const geo = await getGeo();
+      if (geo) { map.setView([geo.lat, geo.lng], 17); placeMarker(geo.lat, geo.lng); }
+    };
+
+    document.getElementById("cancelBaseLocBtn").onclick = () => overlay.remove();
+    document.getElementById("saveBaseLocBtn").onclick = async () => {
+      if (!picked) { alert("دوس عالخريطة أول لتحديد نقطة"); return; }
+      const radius = +document.getElementById("radiusSlider").value;
+      await setBaseLocation({ lat: picked.lat, lng: picked.lng, radius });
+      BASE_LOCATION = await getBaseLocation();
+      overlay.remove();
+      renderDuty();
+    };
+  }
+
+  function getGeo() {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat:+pos.coords.latitude.toFixed(5), lng:+pos.coords.longitude.toFixed(5), accuracy:Math.round(pos.coords.accuracy) }),
+        () => resolve(null),
+        { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
+      );
+    });
+  }
+
+  
+// ---------- Requests ----------
+  async function loadRequests() {
+    const { data } = await sb.from("requests").select("*").order("created_at", { ascending:false });
+    return data || [];
+  }
+  function fmtDateAr(iso) { return `${dayNameAr(iso)} — ${monthNameAr(iso)}`; }
+
+  async function loadSwapRequests() {
+    const { data } = await sb.from("swap_requests").select("*").order("created_at", { ascending:false });
+    return data || [];
+  }
+
+  async function renderRequestsTab() {
+    const main = document.getElementById("main");
+    main.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
+    const requests = await loadRequests();
+    const swapRequests = await loadSwapRequests();
+    const allMembers = MEMBERS.map(m => ({ ...m, unitName: (UNITS.find(u=>u.id===m.unit_id)||{}).name || "" }));
+    const memberName = (id) => MEMBERS.find(m => m.id === id)?.name || "—";
+
+    main.innerHTML = `
+      <div class="formCard">
+        <div style="font-weight:800;margin-bottom:10px">طلب غياب جديد (مرض / سفر / إجازة / عذر)</div>
+        <div class="formRow">
+          <select id="reqMember">
+            <option value="">اختر الفرد</option>
+            ${allMembers.map(m => `<option value="${m.id}">${escapeHtml(m.name)} — ${escapeHtml(m.unitName)}</option>`).join("")}
+          </select>
+          <input type="date" id="reqDate" value="${todayISO()}" />
+          <select id="reqType">
+            ${REQUEST_TYPES.map(t => `<option value="${t}">${STATUS[t].label}</option>`).join("")}
+          </select>
+        </div>
+        <input type="text" id="reqNote" placeholder="ملاحظة / سبب (اختياري)" style="margin-top:8px" />
+        <button id="reqSubmit" style="margin-top:10px">إرسال الطلب</button>
+        <div id="reqErr" class="err"></div>
+      </div>
+      <div id="reqList">
+        ${requests.length === 0 ? `<div class="empty">لا يوجد طلبات بعد</div>` : requests.map(r => renderRequestCard(r, allMembers)).join("")}
+      </div>
+
+      <div class="formCard">
+        <div style="font-weight:800;margin-bottom:10px">🔄 طلبات تبديل النوبات</div>
+        ${swapRequests.length === 0 ? `<div class="empty">لا يوجد طلبات تبديل</div>` : swapRequests.map(sr => `
+          <div class="reqCard">
+            <div style="font-size:13px;margin-bottom:6px">
+              <b>${escapeHtml(memberName(sr.requester_id))}</b> ⇄ <b>${escapeHtml(memberName(sr.partner_id))}</b>
+              <div style="font-size:12px;color:#8A97A8">بتاريخ ${sr.swap_date}${sr.note ? ` — ${escapeHtml(sr.note)}` : ""}</div>
+            </div>
+            ${sr.status === "pending" ? `
+              <div style="display:flex;gap:8px">
+                <button class="approveBtn" data-swapapprove="${sr.id}">✔ موافقة</button>
+                <button class="rejectBtn" data-swapreject="${sr.id}">✕ رفض</button>
+              </div>
+            ` : `<div style="font-size:12px;font-weight:800;color:${sr.status==='approved'?'#2FAE60':'#D64545'}">${sr.status==='approved'?'✔ تمت الموافقة':'✕ مرفوض'}</div>`}
+          </div>
+        `).join("")}
+      </div>
+    `;
+
+    main.querySelectorAll("[data-swapapprove]").forEach(btn => btn.addEventListener("click", async () => {
+      await sb.from("swap_requests").update({ status:"approved", decided_at: new Date().toISOString() }).eq("id", btn.getAttribute("data-swapapprove"));
+      renderRequestsTab();
+    }));
+    main.querySelectorAll("[data-swapreject]").forEach(btn => btn.addEventListener("click", async () => {
+      await sb.from("swap_requests").update({ status:"rejected", decided_at: new Date().toISOString() }).eq("id", btn.getAttribute("data-swapreject"));
+      renderRequestsTab();
+    }));
+
+    document.getElementById("reqSubmit").onclick = async () => {
+      const memberId = document.getElementById("reqMember").value;
+      const date = document.getElementById("reqDate").value;
+      const type = document.getElementById("reqType").value;
+      const note = document.getElementById("reqNote").value.trim();
+      const errEl = document.getElementById("reqErr");
+      if (!memberId) { errEl.textContent = "اختر الفرد أولًا"; return; }
+      errEl.textContent = "";
+      const btn = document.getElementById("reqSubmit");
+      btn.disabled = true;
+      await sb.from("requests").insert({ member_id: memberId, date, type, note, status:"pending" });
+      btn.disabled = false;
+      renderRequestsTab();
+    };
+
+    main.querySelectorAll("[data-approve]").forEach(btn => btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-approve");
+      const req = requests.find(r => r.id === id);
+      await sb.from("requests").update({ status:"approved", decided_at: new Date().toISOString() }).eq("id", id);
+      await upsertAttendance(req.member_id, req.date, { status: req.type, verified:false });
+      renderRequestsTab();
+    }));
+    main.querySelectorAll("[data-reject]").forEach(btn => btn.addEventListener("click", async () => {
+      await sb.from("requests").update({ status:"rejected", decided_at: new Date().toISOString() }).eq("id", btn.getAttribute("data-reject"));
+      renderRequestsTab();
+    }));
+    main.querySelectorAll("[data-delreq]").forEach(btn => btn.addEventListener("click", async () => {
+      await sb.from("requests").delete().eq("id", btn.getAttribute("data-delreq"));
+      renderRequestsTab();
+    }));
+  }
+
+  function renderRequestCard(r, allMembers) {
+    const member = allMembers.find(m => m.id === r.member_id);
+    const s = STATUS[r.type];
+    const badgeMap = { pending:{c:"#D89A2E",t:"بانتظار الموافقة"}, approved:{c:"#2FAE60",t:"مُوافَق عليه"}, rejected:{c:"#D64545",t:"مرفوض"} };
+    const b = badgeMap[r.status];
+    return `
+      <div class="reqCard">
+        <div class="reqTop">
+          <div>
+            <div style="font-weight:700">${escapeHtml(member?.name || "(محذوف)")}</div>
+            <div style="font-size:12px;color:#8A97A8">${fmtDateAr(r.date)}</div>
+            ${r.note ? `<div style="font-size:12px;color:#C7D0DC;margin-top:3px">${escapeHtml(r.note)}</div>` : ""}
+          </div>
+          <div style="color:${s.color};font-weight:700;font-size:13px">${s.label}</div>
+        </div>
+        <div class="reqBottom">
+          <span class="badge" style="color:${b.c};border-color:${b.c}">${b.t}</span>
+          ${r.status === "pending" ? `
+            <div style="display:flex;gap:6px">
+              <button class="approveBtn" data-approve="${r.id}">✔ موافقة</button>
+              <button class="rejectBtn" data-reject="${r.id}">✕ رفض</button>
+            </div>
+          ` : `<button class="xbtn" data-delreq="${r.id}">🗑️</button>`}
+        </div>
+      </div>
+    `;
+  }
+
+  // ---------- Public self-service: register once, then auto-login like an app ----------
+  const CREDS_KEY = "duty_member_creds";
+  function saveCreds(memberId, pin) { localStorage.setItem(CREDS_KEY, JSON.stringify({ member_id: memberId, pin })); }
+  function loadCreds() { try { return JSON.parse(localStorage.getItem(CREDS_KEY) || "null"); } catch { return null; } }
+  function clearCreds() { localStorage.removeItem(CREDS_KEY); }
+
+  async function renderCheckinEntry() {
+    const saved = loadCreds();
+    if (saved && saved.member_id && saved.pin) {
+      app.innerHTML = `<div class="loading">...جارِ التحميل</div>`;
+      const { data } = await sb.rpc("member_info", { p_member_id: saved.member_id, p_pin: saved.pin });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) { renderCheckinInfo(row, saved.pin); return; }
+      clearCreds();
+    }
+    renderCheckinChoice();
+  }
+
+  function renderCheckinChoice() {
+    app.innerHTML = `
+      <div class="center"><div class="card" style="max-width:400px;text-align:center">
+        ${SEAL_SVG}
+        <div class="officialTag">النظام الرسمي لتسجيل الدوام</div>
+        <h1>سجلّ الدوام</h1>
+        <p>أول مرة بتفتح هالرابط؟</p>
+        <button id="choiceRegister" style="width:100%;margin-bottom:10px">🆕 أول مرة، سجّل معلوماتك</button>
+        <button class="ghost" id="choiceLogin" style="width:100%">🔑 عندي حساب، دخول بالاسم والرمز</button>
+        <button class="ghost" id="pwaInstallBtn" style="width:100%;margin-top:10px;display:none">📲 ثبّت التطبيق على شاشتك الرئيسية</button>
+      </div></div>
+    `;
+    document.getElementById("choiceRegister").onclick = () => renderRegisterForm();
+    document.getElementById("choiceLogin").onclick = () => renderCheckinLogin();
+    wirePwaInstallButton();
+  }
+
+  async function renderRegisterForm() {
+    app.innerHTML = `<div class="center"><div class="card"><div class="officialTag mono">جارِ التحضير...</div></div></div>`;
+    const { data: hierarchy } = await sb.rpc("public_hierarchy");
+    if (!hierarchy || hierarchy.length === 0) {
+      app.innerHTML = `
+        <div class="center"><div class="card">
+          <h1>⚠️ لا يوجد هيكل بعد</h1>
+          <p>ما في فصائل أو مجموعات مُعرَّفة بعد. تواصل مع المسؤول.</p>
+        </div></div>
+      `;
+      return;
+    }
+    const units = [...new Map(hierarchy.map(r => [r.unit_id, r.unit_name])).entries()];
+    app.innerHTML = `
+      <div class="center"><div class="card" style="max-width:420px;text-align:right">
+        <div style="text-align:center">${SEAL_SVG}<div class="officialTag">تسجيل فرد جديد</div></div>
+        <h1 style="text-align:center">📝 تسجيل فرد جديد</h1>
+        <p style="text-align:center">عبّي معلوماتك بالأسفل — رح يتولّد إلك رمز خاص لازم تحفظه.</p>
+        <input type="text" id="regName" placeholder="الاسم الكامل" />
+        <div id="regNameWarn" style="font-size:11.5px;color:#D89A2E;margin:-6px 0 10px;display:none">⚠️ في فرد مسجل بنفس الاسم بالضبط — إذا انت شخص مختلف، أضف اسم العائلة أو لقب مميز حتى ما يصير لبس.</div>
+        <select id="regUnit">
+          <option value="">اختر السرية</option>
+          ${units.map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join("")}
+        </select>
+        <select id="regPlatoon" disabled><option value="">اختر السرية أولًا</option></select>
+        <select id="regSquad" disabled><option value="">اختر الفصيلة أولًا</option></select>
+        <div id="regShiftInfo" style="font-size:12px;color:#8A97A8;margin:-4px 0 10px;text-align:center"></div>
+        <button id="regSubmit" style="width:100%">تسجيل</button>
+        <div id="regErr" class="err"></div>
+        <button class="linkbtn" id="regBackBtn" style="width:100%;margin-top:10px">🔙 رجوع</button>
+      </div></div>
+    `;
+
+    document.getElementById("regBackBtn").onclick = () => renderCheckinChoice();
+
+    document.getElementById("regName").addEventListener("blur", async (e) => {
+      const name = e.target.value.trim();
+      const warnEl = document.getElementById("regNameWarn");
+      if (!name) { warnEl.style.display = "none"; return; }
+      const { data: exists } = await sb.rpc("check_name_exists", { p_name: name });
+      warnEl.style.display = exists ? "block" : "none";
+    });
+
+    const unitSel = document.getElementById("regUnit");
+    const platoonSel = document.getElementById("regPlatoon");
+    const squadSel = document.getElementById("regSquad");
+    const shiftInfo = document.getElementById("regShiftInfo");
+
+    unitSel.onchange = () => {
+      const uid = unitSel.value;
+      const platoons = [...new Map(hierarchy.filter(r => r.unit_id === uid).map(r => [r.platoon_id, r.platoon_name])).entries()];
+      platoonSel.disabled = !uid;
+      platoonSel.innerHTML = `<option value="">اختر الفصيلة</option>${platoons.map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join("")}`;
+      squadSel.disabled = true;
+      squadSel.innerHTML = `<option value="">اختر الفصيلة أولًا</option>`;
+      shiftInfo.textContent = "";
+    };
+    platoonSel.onchange = () => {
+      const pid = platoonSel.value;
+      const squads = hierarchy.filter(r => r.platoon_id === pid).map(r => [r.squad_id, r.squad_name]);
+      squadSel.disabled = !pid;
+      squadSel.innerHTML = `<option value="">اختر المجموعة</option>${squads.map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join("")}`;
+      shiftInfo.textContent = "";
+    };
+    squadSel.onchange = async () => {
+      const pid = platoonSel.value;
+      if (!pid) return;
+      shiftInfo.textContent = "...جارِ تحديد النوبة الحالية";
+      const { data } = await sb.rpc("public_current_shift", { p_platoon_id: pid });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row || !row.on_duty) {
+        shiftInfo.textContent = "فصيلتك مستريحة هالأسبوع (سريتك مو مناوبة)";
+      } else if (!row.shift) {
+        shiftInfo.textContent = "الفصيلة مناوبة، بس لسا ما تحدد إلها نوبة معيّنة";
+      } else {
+        const s = SHIFTS.find(x => x.id === row.shift);
+        shiftInfo.textContent = `نوبتك الحالية: ${s ? s.label : row.shift} (${s ? s.range : ""})`;
+      }
+    };
+
+    document.getElementById("regSubmit").onclick = async () => {
+      const name = document.getElementById("regName").value.trim();
+      const squadId = squadSel.value;
+      const errEl = document.getElementById("regErr");
+      if (!name) { errEl.textContent = "اكتب اسمك"; return; }
+      if (!squadId) { errEl.textContent = "اختر المجموعة"; return; }
+      errEl.textContent = "";
+      const btn = document.getElementById("regSubmit");
+      btn.disabled = true; btn.textContent = "...";
+      const { data, error } = await sb.rpc("self_register", { p_name: name, p_squad_id: squadId });
+      const result = Array.isArray(data) ? data[0] : data;
+      if (error || !result) {
+        btn.disabled = false; btn.textContent = "تسجيل";
+        errEl.textContent = "صار خطأ، جرب مرة ثانية.";
+        return;
+      }
+      saveCreds(result.member_id, result.pin);
+      renderRegisterSuccess(name, result.pin, result.member_id);
+    };
+  }
+
+  function renderRegisterSuccess(name, pin, memberId) {
+    app.innerHTML = `
+      <div class="center"><div class="card">
+        ${SEAL_SVG}
+        <h1>✅ تم التسجيل يا ${escapeHtml(name)}</h1>
+        <p>هذا رمزك الخاص — احفظه منيح، بتحتاجه إذا فتحت من جهاز تاني:</p>
+        <div class="mono" style="font-size:34px;font-weight:700;letter-spacing:8px;color:#D89A2E;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px">${escapeHtml(pin)}</div>
+        <p style="font-size:12px">من هالجهاز، رح يفتحلك التطبيق عليك مباشرة من بعد هلق، بدون ما تحتاج تكتب اسمك أو رمزك مرة ثانية.</p>
+        <button id="regContinueBtn" style="width:100%;margin-top:10px">متابعة</button>
+      </div></div>
+    `;
+    document.getElementById("regContinueBtn").onclick = async () => {
+      const { data } = await sb.rpc("member_info", { p_member_id: memberId, p_pin: pin });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) renderCheckinInfo(row, pin);
+    };
+  }
+
+  // ---------- Public daily self check-in (name + PIN, manual fallback for a new device) ----------
+  function renderCheckinLogin(prefill) {
+    app.innerHTML = `
+      <div class="center"><div class="card" style="max-width:400px;text-align:right">
+        <div style="text-align:center">${SEAL_SVG}</div>
+        <h1 style="text-align:center">🪪 تسجيل حضور</h1>
+        <p style="text-align:center">اكتب اسمك ورمزك الشخصي</p>
+        <input type="text" id="ciName" placeholder="اسمك الكامل" value="${escapeHtml(prefill?.name||"")}" />
+        <input class="mono" type="text" id="ciPin" placeholder="الرمز الشخصي (٤ أرقام)" inputmode="numeric" maxlength="4" style="text-align:center;letter-spacing:4px" />
+        <button id="ciSubmit" style="width:100%">دخول</button>
+        <div id="ciErr" class="err"></div>
+        <button class="linkbtn" id="ciChoiceBackBtn" style="width:100%;margin-top:10px">🔙 رجوع</button>
+      </div></div>
+    `;
+    document.getElementById("ciChoiceBackBtn").onclick = () => renderCheckinChoice();
+    document.getElementById("ciSubmit").onclick = async () => {
+      const name = document.getElementById("ciName").value.trim();
+      const pin = document.getElementById("ciPin").value.trim();
+      const errEl = document.getElementById("ciErr");
+      if (!name || !pin) { errEl.textContent = "عبّي اسمك ورمزك"; return; }
+      errEl.textContent = "";
+      const btn = document.getElementById("ciSubmit");
+      btn.disabled = true; btn.textContent = "...";
+      const { data, error } = await sb.rpc("member_login", { p_name: name, p_pin: pin });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (error || !row) {
+        btn.disabled = false; btn.textContent = "دخول";
+        errEl.textContent = (error?.message||"").includes("locked")
+          ? "🔒 محاولات كتير خاطئة — جرب بعد دقيقتين."
+          : "الاسم أو الرمز غير صحيح، جرب مرة ثانية.";
+        return;
+      }
+      saveCreds(row.member_id, pin);
+      renderCheckinInfo(row, pin);
+    };
+  }
+
+  function isNowWithinShift(shiftId) {
+    const s = SHIFTS.find(x => x.id === shiftId);
+    if (!s) return null;
+    const start = new Date(`${todayISO()}T${pad(s.start)}:00:00`);
+    const end = new Date(start.getTime() + 8 * 3600 * 1000);
+    const now = new Date();
+    if (now < start) return "before";
+    if (now >= end) return "after";
+    return "within";
+  }
+
+  async function checkEmergencyBroadcast(row) {
+    if (!row.on_duty) return;
+    try {
+      const { data } = await sb.rpc("get_emergency_broadcast");
+      if (!data || !data.message || !data.sent_at) return;
+      const seenKey = "emergencySeen_" + data.sent_at;
+      if (localStorage.getItem(seenKey)) return;
+      const box = document.getElementById("emergencyBannerBox");
+      if (!box) return;
+      box.innerHTML = `
+        <div style="background:#3D1518;border:1px solid #D64545;border-radius:10px;padding:12px;margin:0 0 12px">
+          <div style="font-weight:800;color:#FF6B6B;margin-bottom:6px">🚨 رسالة طارئة من المسؤول</div>
+          <div style="font-size:13.5px;color:#F1D4D4;line-height:1.7;margin-bottom:10px">${escapeHtml(data.message)}</div>
+          <button id="emergencyDismissBtn" style="width:100%;background:#D64545;border-color:#D64545">فهمت ✔</button>
+        </div>
+      `;
+      document.getElementById("emergencyDismissBtn").onclick = () => {
+        localStorage.setItem(seenKey, "1");
+        box.innerHTML = "";
+      };
+    } catch (e) { /* تجاهل بهدوء إذا الدالة غير متوفرة بعد */ }
+  }
+
+  function renderCheckinInfo(row, pin) {
+    let shiftText;
+    if (!row.on_duty) shiftText = "فصيلتك مستريحة هالأسبوع (سريتك مو مناوبة)";
+    else if (!row.shift) shiftText = "الفصيلة مناوبة، بس لسا ما تحدد إلها نوبة معيّنة";
+    else { const s = SHIFTS.find(x => x.id === row.shift); shiftText = `${s ? s.label : row.shift} (${s ? s.range : ""})`; }
+
+    let statusBox;
+    const shiftWindow = (row.on_duty && row.shift) ? isNowWithinShift(row.shift) : null;
+    if (row.today_status === "present") {
+      const rangeHtml = typeof row.today_in_range === "boolean"
+        ? (row.today_in_range
+            ? `<div style="font-size:12px;color:#2FAE60;margin-top:4px">✔ داخل نطاق القاعدة</div>`
+            : `<div style="font-size:12px;color:#D64545;margin-top:4px">⚠️ خارج نطاق القاعدة (~<span class="mono">${row.today_distance_m}</span> م)</div>`)
+        : "";
+      const endedNote = shiftWindow === "after" ? `<div style="font-size:12px;color:#8A97A8;margin-top:6px">🌙 نوبتك خلصت لهلق</div>` : "";
+      statusBox = `
+        <div class="formCard" style="text-align:center">
+          <div style="font-weight:800;color:#2FAE60">✅ أكدت حضورك اليوم الساعة <span class="mono">${escapeHtml(row.today_time_in||"")}</span></div>
+          ${rangeHtml}${endedNote}
+        </div>`;
+    } else if (row.today_status && REQUEST_TYPES.includes(row.today_status)) {
+      statusBox = `<div class="formCard" style="text-align:center"><div style="font-weight:800;color:${STATUS[row.today_status].color}">📋 عندك ${STATUS[row.today_status].label} مسجّلة اليوم</div></div>`;
+    } else if (shiftWindow === "before") {
+      const s = SHIFTS.find(x => x.id === row.shift);
+      statusBox = `<div class="formCard" style="text-align:center"><div style="font-weight:800;color:#8A97A8">⏳ نوبتك لسا ما بلشت — بتبلش الساعة <span class="mono">${s?.range||""}</span></div></div>`;
+    } else if (shiftWindow === "after") {
+      statusBox = `<div class="formCard" style="text-align:center"><div style="font-weight:800;color:#8A97A8">🌙 نوبتك خلصت لهلق</div></div>`;
+    } else {
+      statusBox = `<button id="ciConfirmBtn" style="width:100%">📍 تأكيد الحضور الآن</button>`;
+    }
+
+    app.innerHTML = `
+      <div class="center"><div class="card" style="max-width:400px;text-align:right">
+        <div style="text-align:center">${SEAL_SVG}</div>
+        <div id="emergencyBannerBox"></div>
+        <h1 style="text-align:center">👋 أهلًا ${escapeHtml(row.member_name)}</h1>
+        <div class="formCard">
+          <div style="font-size:13px;line-height:2">
+            <div>🏢 السرية: <b>${escapeHtml(row.unit_name||"—")}</b></div>
+            <div>🚩 الفصيلة: <b>${escapeHtml(row.platoon_name||"—")}</b>${row.platoon_commander ? ` — قائدها: ${escapeHtml(row.platoon_commander)}` : ""}</div>
+            <div>👥 المجموعة: <b>${escapeHtml(row.squad_name||"—")}</b>${row.squad_commander ? ` — قائدها: ${escapeHtml(row.squad_commander)}` : ""}</div>
+            <div>⏰ نوبتك: <b>${shiftText}</b></div>
+          </div>
+        </div>
+        ${statusBox}
+        <div id="ciConfirmErr" class="err"></div>
+
+        <div class="formCard" id="pushEnableCard" style="display:none">
+          <div style="font-weight:800;margin-bottom:6px">🔔 إشعارات الطوارئ</div>
+          <div style="font-size:12px;color:#8A97A8;margin-bottom:8px">فعّلها حتى توصلك رسالة المسؤول فورًا بصوت على هالجهاز، حتى لو التطبيق مسكر.</div>
+          <button id="enablePushBtn" style="width:100%">🔔 فعّل إشعارات الطوارئ</button>
+          <div id="pushStatus" style="font-size:12px;margin-top:6px"></div>
+        </div>
+
+        <div class="formCard">
+          <div style="font-weight:800;cursor:pointer" id="toggleReqForm">📋 عندي عذر (مرض / سفر / إجازة / عذر) ▾</div>
+          <div id="reqFormBox" style="display:none;margin-top:10px">
+            <select id="reqType">
+              <option value="sick">مرض</option>
+              <option value="travel">سفر</option>
+              <option value="leave">إجازة</option>
+              <option value="excuse">عذر</option>
+            </select>
+            <input type="date" id="reqDate" value="${todayISO()}" />
+            <input type="text" id="reqNote" placeholder="ملاحظة (اختياري)" />
+            <button id="reqSubmitBtn" style="width:100%">إرسال الطلب</button>
+            <div id="reqErr" class="err"></div>
+          </div>
+        </div>
+
+        <div class="formCard">
+          <div style="font-weight:800;margin-bottom:8px">📜 طلباتي الأخيرة</div>
+          <div id="myRequestsList" style="font-size:12px;color:#8A97A8">...جارِ التحميل</div>
+        </div>
+
+        <div class="formCard">
+          <div style="font-weight:800;cursor:pointer" id="toggleSwapForm">🔄 تبديل نوبة مع فرد تاني ▾</div>
+          <div id="swapFormBox" style="display:none;margin-top:10px">
+            <input type="text" id="swapPartnerSearch" placeholder="اكتب اسم الفرد يلي بدك تبدّل معه" />
+            <div id="swapPartnerResults" style="margin-bottom:8px"></div>
+            <div id="swapPartnerChosen" style="font-size:12px;color:#D89A2E;margin-bottom:8px;display:none"></div>
+            <input type="date" id="swapDate" value="${todayISO()}" />
+            <input type="text" id="swapNote" placeholder="ملاحظة (اختياري)" />
+            <button id="swapSubmitBtn" style="width:100%">إرسال طلب التبديل</button>
+            <div id="swapErr" class="err"></div>
+          </div>
+        </div>
+
+        <div class="formCard">
+          <div style="font-weight:800;margin-bottom:8px">🔄 طلبات التبديل</div>
+          <div id="mySwapsList" style="font-size:12px;color:#8A97A8">...جارِ التحميل</div>
+        </div>
+
+        <button class="ghost" id="pwaInstallBtn" style="width:100%;margin-top:10px;display:none">📲 ثبّت التطبيق على شاشتك الرئيسية</button>
+        <button class="linkbtn" id="ciBackBtn" style="width:100%;margin-top:10px">🔄 مو أنا — سجّل خروج من هالجهاز</button>
+      </div></div>
+    `;
+
+    let chosenPartnerId = null;
+    const REQ_STATUS_LABELS = { pending:"⏳ قيد الانتظار", approved:"✅ تمت الموافقة", rejected:"❌ مرفوض" };
+    async function loadMyRequests() {
+      const box = document.getElementById("myRequestsList");
+      const { data } = await sb.rpc("member_my_requests", { p_member_id: row.member_id, p_pin: pin });
+      if (!data || data.length === 0) { box.innerHTML = `<div style="color:#5B6779">ما قدّمت أي طلب لهلق</div>`; return; }
+      box.innerHTML = data.map(r => `
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1E2B41">
+          <span>${STATUS[r.type]?.label || r.type} — ${r.date}</span>
+          <span>${REQ_STATUS_LABELS[r.status] || r.status}</span>
+        </div>
+      `).join("");
+    }
+    async function loadMySwaps() {
+      const box = document.getElementById("mySwapsList");
+      const { data } = await sb.rpc("member_my_swap_requests", { p_member_id: row.member_id, p_pin: pin });
+      if (!data || data.length === 0) { box.innerHTML = `<div style="color:#5B6779">ما في طلبات تبديل</div>`; return; }
+      box.innerHTML = data.map(s => `
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1E2B41">
+          <span>${s.i_am_requester ? "مع" : "طلب من"} ${escapeHtml(s.other_name)} — ${s.swap_date}</span>
+          <span>${REQ_STATUS_LABELS[s.status] || s.status}</span>
+        </div>
+      `).join("");
+    }
+    loadMyRequests();
+    loadMySwaps();
+    checkEmergencyBroadcast(row);
+
+    (function setupPushUI() {
+      const card = document.getElementById("pushEnableCard");
+      if (!card) return;
+      if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+      if (Notification.permission === "granted") { initPushSilent(row.member_id); return; }
+      if (Notification.permission === "denied") return;
+      card.style.display = "block";
+      document.getElementById("enablePushBtn").onclick = () => {
+        enablePushNotifications(row.member_id, document.getElementById("enablePushBtn"), document.getElementById("pushStatus"));
+      };
+    })();
+
+    document.getElementById("toggleReqForm").onclick = () => {
+      const box = document.getElementById("reqFormBox");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    };
+    document.getElementById("toggleSwapForm").onclick = () => {
+      const box = document.getElementById("swapFormBox");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    };
+    document.getElementById("swapPartnerSearch").oninput = async (e) => {
+      const q = e.target.value.trim();
+      const resBox = document.getElementById("swapPartnerResults");
+      if (!q) { resBox.innerHTML = ""; return; }
+      const { data } = await sb.rpc("search_members_public", { p_query: q });
+      const matches = (data || []).filter(m => m.id !== row.member_id);
+      resBox.innerHTML = matches.map(m => `
+        <div class="smallMember" data-pick="${m.id}" data-pickname="${escapeHtml(m.name)}" style="cursor:pointer">
+          <span>${escapeHtml(m.name)}</span>
+          <span style="font-size:11px;color:#8A97A8">${escapeHtml(m.unit_name||"")}</span>
+        </div>
+      `).join("");
+      resBox.querySelectorAll("[data-pick]").forEach(el => el.addEventListener("click", () => {
+        chosenPartnerId = el.getAttribute("data-pick");
+        const chosenBox = document.getElementById("swapPartnerChosen");
+        chosenBox.style.display = "block";
+        chosenBox.textContent = `✔ اخترت: ${el.getAttribute("data-pickname")}`;
+        resBox.innerHTML = "";
+        document.getElementById("swapPartnerSearch").value = "";
+      }));
+    };
+    document.getElementById("swapSubmitBtn").onclick = async () => {
+      const date = document.getElementById("swapDate").value;
+      const note = document.getElementById("swapNote").value.trim();
+      const errEl = document.getElementById("swapErr");
+      if (!chosenPartnerId) { errEl.textContent = "اختر الفرد يلي بدك تبدّل معه من نتائج البحث"; return; }
+      if (!date) { errEl.textContent = "اختر التاريخ"; return; }
+      errEl.textContent = "";
+      const btn = document.getElementById("swapSubmitBtn");
+      btn.disabled = true; btn.textContent = "...";
+      const { error } = await sb.rpc("submit_swap_request", { p_member_id: row.member_id, p_pin: pin, p_partner_id: chosenPartnerId, p_date: date, p_note: note || null });
+      btn.disabled = false; btn.textContent = "إرسال طلب التبديل";
+      if (error) { errEl.textContent = "صار خطأ، جرب مرة ثانية."; return; }
+      chosenPartnerId = null;
+      document.getElementById("swapPartnerChosen").style.display = "none";
+      document.getElementById("swapNote").value = "";
+      document.getElementById("swapFormBox").style.display = "none";
+      loadMySwaps();
+    };
+
+    document.getElementById("reqSubmitBtn").onclick = async () => {
+      const type = document.getElementById("reqType").value;
+      const date = document.getElementById("reqDate").value;
+      const note = document.getElementById("reqNote").value.trim();
+      const errEl = document.getElementById("reqErr");
+      if (!date) { errEl.textContent = "اختر التاريخ"; return; }
+      errEl.textContent = "";
+      const btn = document.getElementById("reqSubmitBtn");
+      btn.disabled = true; btn.textContent = "...";
+      const { error } = await sb.rpc("submit_leave_request", { p_member_id: row.member_id, p_pin: pin, p_type: type, p_date: date, p_note: note || null });
+      btn.disabled = false; btn.textContent = "إرسال الطلب";
+      if (error) { errEl.textContent = "صار خطأ، جرب مرة ثانية."; return; }
+      document.getElementById("reqNote").value = "";
+      document.getElementById("reqFormBox").style.display = "none";
+      loadMyRequests();
+    };
+
+    const confirmBtn = document.getElementById("ciConfirmBtn");
+    if (confirmBtn) confirmBtn.onclick = async () => {
+      confirmBtn.disabled = true; confirmBtn.textContent = "...جارِ تحديد الموقع";
+      const geo = await getGeo();
+      if (!geo) {
+        confirmBtn.disabled = false; confirmBtn.textContent = "📍 تأكيد الحضور الآن";
+        document.getElementById("ciConfirmErr").textContent = "لازم تسمح بالوصول للموقع لتأكيد الحضور.";
+        return;
+      }
+      const { data: resultGeo, error } = await sb.rpc("member_checkin", {
+        p_member_id: row.member_id, p_pin: pin, p_lat: geo.lat, p_lng: geo.lng, p_accuracy: geo.accuracy
+      });
+      if (error) {
+        confirmBtn.disabled = false; confirmBtn.textContent = "📍 تأكيد الحضور الآن";
+        document.getElementById("ciConfirmErr").textContent = "صار خطأ، جرب مرة ثانية.";
+        return;
+      }
+      row.today_status = "present";
+      row.today_time_in = new Date().toTimeString().slice(0,5);
+      row.today_in_range = resultGeo?.in_range;
+      row.today_distance_m = resultGeo?.distance_m;
+      renderCheckinInfo(row, pin);
+    };
+
+    document.getElementById("ciBackBtn").onclick = () => { clearCreds(); renderCheckinChoice(); };
+    wirePwaInstallButton();
+  }
+
+  let deferredInstallPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const btn = document.getElementById("pwaInstallBtn");
+    if (btn) btn.style.display = "block";
+  });
+  function wirePwaInstallButton() {
+    const btn = document.getElementById("pwaInstallBtn");
+    if (!btn) return;
+    if (deferredInstallPrompt) btn.style.display = "block";
+    btn.onclick = async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      btn.style.display = "none";
+    };
+  }
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+
+  (async () => {
+    if (checkinMode) { await renderCheckinEntry(); return; }
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) await bootApp();
+    else renderLogin();
+  })();
+
+</script>
+</body>
+</html>
